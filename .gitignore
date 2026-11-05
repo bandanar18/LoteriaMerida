@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+.vite/
+coverage/
+
+# Documentos KYC cifrados (nunca al repositorio)
+apps/api/storage/

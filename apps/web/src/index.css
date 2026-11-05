@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-selva-950: #071f17;
+  --color-selva-900: #0b2c21;
+  --color-selva-800: #0f3d2e;
+  --color-selva-700: #155c43;
+  --color-selva-600: #1b7a58;
+  --color-selva-500: #22996e;
+  --color-oro-300: #f8dd8a;
+  --color-oro-400: #f4c94f;
+  --color-oro-500: #e8b021;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: #f3f5f2;
+  color: #12201a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility card {
+  @apply rounded-2xl bg-white shadow-sm ring-1 ring-black/5;
+}
+@utility btn {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-selva-700 text-white hover:bg-selva-600;
+}
+@utility btn-gold {
+  @apply btn bg-oro-400 text-selva-950 hover:bg-oro-300;
+}
+@utility btn-ghost {
+  @apply btn bg-black/5 text-selva-900 hover:bg-black/10;
+}
+@utility btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-500;
+}
+@utility input {
+  @apply w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-selva-600 focus:ring-2 focus:ring-selva-600/20;
+}
+@utility label {
+  @apply mb-1 block text-xs font-medium text-black/60;
+}
+@utility badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+}
+
+@layer components {
+  .table-base {
+    @apply w-full text-left text-sm;
+  }
+  .table-base th {
+    @apply border-b border-black/10 px-3 py-2 text-xs font-medium tracking-wide text-black/50 uppercase;
+  }
+  .table-base td {
+    @apply border-b border-black/5 px-3 py-2 align-top;
+  }
+}

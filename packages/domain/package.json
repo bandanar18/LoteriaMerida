@@ -1,0 +1,17 @@
+{
+  "name": "@loteria/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reglas de negocio puras y deterministas (sin I/O): dinero, animalitos, equidad, identidad.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

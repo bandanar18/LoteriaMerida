@@ -1,0 +1,21 @@
+{
+  "name": "loteria",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma de apuestas — MVP Fase 0+1 (núcleo financiero + Animalitos)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "build:domain": "npm run build -w @loteria/domain",
+    "migrate": "npm run build:domain && npm run migrate -w @loteria/api",
+    "seed": "npm run seed -w @loteria/api",
+    "dev:api": "npm run build:domain && npm run dev -w @loteria/api",
+    "dev:web": "npm run dev -w @loteria/web",
+    "test": "npm run test -w @loteria/domain",
+    "typecheck": "npm run build:domain && npm run typecheck -w @loteria/api && npm run typecheck -w @loteria/web"
+  }
+}
