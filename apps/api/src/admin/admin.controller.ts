@@ -32,10 +32,10 @@ export class AdminController {
     const byCurrency = await this.db.query(
       `SELECT c.code AS currency,
               coalesce((SELECT sum(t.total) FROM lottery.ticket t
-                         WHERE t.currency = c.code AND t.status <> 'CANCELLED'
+                         WHERE t.currency = c.code AND t.status <> 'CANCELLED' AND NOT t.is_simulation
                            AND (t.sold_at AT TIME ZONE 'America/Caracas')::date = $1::date), 0)::text AS sales,
               coalesce((SELECT sum(p.win) FROM lottery.play p JOIN lottery.ticket t ON t.id = p.ticket_id
-                         WHERE t.currency = c.code AND p.status = 'WON'
+                         WHERE t.currency = c.code AND p.status = 'WON' AND NOT t.is_simulation
                            AND (p.settled_at AT TIME ZONE 'America/Caracas')::date = $1::date), 0)::text AS payouts,
               coalesce((SELECT sum(b.stake) FROM sports.bet_slip b
                          WHERE b.currency = c.code AND (b.placed_at AT TIME ZONE 'America/Caracas')::date = $1::date), 0)::text AS sports_sales,
@@ -54,14 +54,38 @@ export class AdminController {
               (SELECT count(*) FROM payments.deposit WHERE status = 'PENDING')::int AS pending_deposits,
               (SELECT count(*) FROM payments.withdrawal WHERE status = 'REQUESTED')::int AS pending_withdrawals,
               (SELECT count(*) FROM lottery.draw WHERE status = 'RESULT_PENDING')::int AS pending_results,
-              (SELECT count(*) FROM lottery.ticket WHERE (sold_at AT TIME ZONE 'America/Caracas')::date = $1::date)::int AS tickets_today,
+              (SELECT count(*) FROM lottery.ticket WHERE NOT is_simulation AND (sold_at AT TIME ZONE 'America/Caracas')::date = $1::date)::int AS tickets_today,
               (SELECT count(*) FROM identity.kyc_request WHERE status = 'PENDING')::int AS pending_kyc,
               (SELECT count(*) FROM sports.event WHERE result_status = 'PROPOSED')::int AS pending_sports_results,
               (SELECT count(*) FROM sports.event WHERE status = 'LIVE')::int AS live_events,
               (SELECT count(*) FROM sports.bet_slip WHERE (placed_at AT TIME ZONE 'America/Caracas')::date = $1::date)::int AS bets_today`,
       [day],
     );
-    return { day, byCurrency, counts };
+    // Desglose del día por juego (Animalitos, Frutas…): ventas y premios por moneda, tickets y sorteos.
+    const byGame = await this.db.query(
+      `SELECT g.id, g.code, g.name,
+              (SELECT coalesce(jsonb_object_agg(x.currency, jsonb_build_object('sales', x.sales::text, 'payouts', x.payouts::text)), '{}'::jsonb)
+                 FROM (SELECT c.code AS currency,
+                              coalesce((SELECT sum(t.total) FROM lottery.ticket t
+                                         WHERE t.game_id = g.id AND t.currency = c.code AND t.status <> 'CANCELLED' AND NOT t.is_simulation
+                                           AND (t.sold_at AT TIME ZONE g.timezone)::date = $1::date), 0) AS sales,
+                              coalesce((SELECT sum(p.win) FROM lottery.play p JOIN lottery.ticket t ON t.id = p.ticket_id
+                                         WHERE t.game_id = g.id AND t.currency = c.code AND p.status = 'WON' AND NOT t.is_simulation
+                                           AND (p.settled_at AT TIME ZONE g.timezone)::date = $1::date), 0) AS payouts
+                         FROM wallet.currency c) x) AS money,
+              (SELECT count(*) FROM lottery.ticket t WHERE t.game_id = g.id AND NOT t.is_simulation
+                  AND (t.sold_at AT TIME ZONE g.timezone)::date = $1::date)::int AS tickets_today,
+              (SELECT count(*) FROM lottery.draw d WHERE d.game_id = g.id AND d.sim_player_id IS NULL
+                  AND d.status <> 'CANCELLED' AND (d.draw_at AT TIME ZONE g.timezone)::date = $1::date)::int AS draws_today,
+              (SELECT count(*) FROM lottery.draw d WHERE d.game_id = g.id AND d.sim_player_id IS NULL AND d.status = 'SETTLED'
+                  AND (d.draw_at AT TIME ZONE g.timezone)::date = $1::date)::int AS settled_today,
+              (SELECT count(*) FROM lottery.draw d WHERE d.game_id = g.id AND d.status = 'RESULT_PENDING')::int AS pending_results,
+              (SELECT min(d.draw_at) FROM lottery.draw d WHERE d.game_id = g.id AND d.sim_player_id IS NULL
+                  AND d.status IN ('SCHEDULED', 'OPEN') AND d.draw_at > now()) AS next_draw_at
+         FROM lottery.game g WHERE g.status = 'ACTIVE' ORDER BY g.display_order, g.code`,
+      [day],
+    );
+    return { day, byCurrency, byGame, counts };
   }
 
   @Get('players')

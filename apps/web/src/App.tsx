@@ -10,14 +10,18 @@ import { DashboardPage } from './pages/admin/Dashboard';
 import { DrawsPage } from './pages/admin/Draws';
 import { KycPage } from './pages/admin/Kyc';
 import { PaymentsPage } from './pages/admin/Payments';
-import { SportsTradingPage } from './pages/admin/Sports';
-import { SportsPage } from './pages/Sports';
 import { PlayersPage } from './pages/admin/Players';
+import { RiskPage } from './pages/admin/Risk';
+import { MarketPage } from './pages/admin/Market';
+import { SettingsPage } from './pages/admin/Settings';
 import { LoginPage, RegisterPage } from './pages/Auth';
 import { PlayPage } from './pages/Play';
 import { ResultsPage } from './pages/Results';
+import { SimulatorPage } from './pages/Simulator';
 import { TicketsPage } from './pages/Tickets';
 import { WalletPage } from './pages/Wallet';
+import { FuturesPage } from './pages/Futures';
+import { FuturesAdminPage } from './pages/admin/Futures';
 
 function Require({ kind, children }: { kind: 'PLAYER' | 'STAFF'; children: ReactNode }) {
   const { user, ready } = useAuth();
@@ -35,20 +39,24 @@ export function App() {
     <Routes>
       <Route element={<PlayerLayout />}>
         <Route index element={<PlayPage />} />
-        <Route path="deportes" element={<SportsPage />} />
         <Route path="resultados" element={<ResultsPage />} />
+        <Route path="futuros" element={<FuturesPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="registro" element={<RegisterPage />} />
         <Route path="tickets" element={<Require kind="PLAYER"><TicketsPage /></Require>} />
+        <Route path="simulador" element={<Require kind="PLAYER"><SimulatorPage /></Require>} />
         <Route path="billetera" element={<Require kind="PLAYER"><WalletPage /></Require>} />
         <Route path="cuenta" element={<Require kind="PLAYER"><AccountPage /></Require>} />
       </Route>
       <Route path="admin" element={<Require kind="STAFF"><AdminLayout /></Require>}>
         <Route index element={<DashboardPage />} />
         <Route path="sorteos" element={<DrawsPage />} />
+        <Route path="riesgo" element={<RiskPage />} />
+        <Route path="mercado" element={<MarketPage />} />
+        <Route path="configuracion" element={<SettingsPage />} />
+        <Route path="futuros" element={<FuturesAdminPage />} />
         <Route path="pagos" element={<PaymentsPage />} />
         <Route path="kyc" element={<KycPage />} />
-        <Route path="deportes" element={<SportsTradingPage />} />
         <Route path="jugadores" element={<PlayersPage />} />
         <Route path="auditoria" element={<AuditPage />} />
       </Route>

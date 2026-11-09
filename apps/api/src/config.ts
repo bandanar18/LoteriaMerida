@@ -21,12 +21,19 @@ export const config = {
   accessTokenTtlSeconds: Number(process.env.ACCESS_TOKEN_TTL_SECONDS ?? 900),
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7),
   lotteryScheduler: (process.env.LOTTERY_SCHEDULER ?? 'true') === 'true',
+  /** Deportes en pausa: por ahora solo se trabaja con animalitos. Con false el API no expone /sports ni /admin/sports. */
+  sportsEnabled: (process.env.SPORTS_ENABLED ?? 'false') === 'true',
   licenseLabel: process.env.LICENSE_LABEL ?? '',
   kyc: {
     storageDir: resolve(__dirname, '..', process.env.KYC_STORAGE_DIR ?? 'storage/kyc'),
     /** 32 bytes en hex (64 caracteres) para AES-256-GCM. */
     encryptionKey: kycKey(required('KYC_ENCRYPTION_KEY')),
   },
+  /**
+   * Simulador para jugadores (recarga de saldo de prueba y sorteo privado al instante), solo en juegos demo.
+   * Apagado por defecto en producción.
+   */
+  simulationMode: (process.env.SIMULATION_MODE ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')) === 'true',
   /** Retardo de aceptación de apuestas en vivo (Doc. Maestro §7.7). */
   liveBetDelayMs: Number(process.env.LIVE_BET_DELAY_MS ?? 5000),
   payment: {

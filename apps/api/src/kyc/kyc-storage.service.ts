@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'crypto';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { config } from '../config';
 
 export interface StoredFile {
@@ -12,17 +12,18 @@ export interface StoredFile {
 }
 
 /**
- * Almacén de documentos KYC cifrados en reposo con AES-256-GCM (Doc. Maestro §20).
+ * Almacén de documentos sensibles (KYC, actas de sorteo) cifrados en reposo con AES-256-GCM (Doc. Maestro §20).
+ * Las actas van en el subdirectorio "actas/" con la misma clave.
  * En producción esto se sustituye por S3/MinIO con cifrado del lado del servidor + KMS.
  */
 @Injectable()
 export class KycStorageService {
-  async save(content: Buffer): Promise<StoredFile> {
+  async save(content: Buffer, namespace: '' | 'actas' = ''): Promise<StoredFile> {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', config.kyc.encryptionKey, iv);
     const encrypted = Buffer.concat([cipher.update(content), cipher.final()]);
-    const storageKey = `${randomUUID()}.bin`;
-    await mkdir(config.kyc.storageDir, { recursive: true });
+    const storageKey = `${namespace ? `${namespace}/` : ''}${randomUUID()}.bin`;
+    await mkdir(dirname(this.path(storageKey)), { recursive: true });
     await writeFile(this.path(storageKey), encrypted, { flag: 'wx' });
     return {
       storageKey,
@@ -48,7 +49,8 @@ export class KycStorageService {
   }
 
   private path(storageKey: string) {
-    if (!/^[0-9a-f-]{36}\.bin$/.test(storageKey)) throw new Error('Clave de almacenamiento inválida');
+    // Solo nombres generados por save(): sin rutas relativas ni otros directorios.
+    if (!/^(actas\/)?[0-9a-f-]{36}\.bin$/.test(storageKey)) throw new Error('Clave de almacenamiento inválida');
     return join(config.kyc.storageDir, storageKey);
   }
 }

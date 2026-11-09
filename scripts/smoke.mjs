@@ -1,6 +1,6 @@
 // Prueba end-to-end del API contra un servidor local en marcha.
 //   node scripts/smoke.mjs          → flujo rápido (animalitos, pagos, KYC, tiempo real, deportes, ledger, auditoría)
-//   node scripts/smoke.mjs --wait   → además crea sorteos extraordinarios y espera ~6 min a que se sorteen y liquiden
+//   node scripts/smoke.mjs --wait   → además espera ~8 min: sorteo automático por RNG y flujo con acta y 4 ojos
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { io } from 'socket.io-client';
@@ -29,10 +29,10 @@ async function call(method, path, { token, body, headers = {} } = {}) {
   return { status: res.status, data: text ? JSON.parse(text) : null };
 }
 
-// Crea un sorteo extraordinario en el primer minuto libre a partir de 7 min.
-async function extraordinary(gameId, token) {
+// Crea un sorteo extraordinario en el primer minuto libre a partir de 7 min (auto = resultado por RNG a la hora).
+async function extraordinary(gameId, token, auto = false) {
   for (let m = 7; m < 15; m++) {
-    const r = await call('POST', `/admin/lottery/games/${gameId}/extraordinary-draw`, { token, body: { minutesFromNow: m } });
+    const r = await call('POST', `/admin/lottery/games/${gameId}/extraordinary-draw`, { token, body: { minutesFromNow: m, auto } });
     if (r.status === 201) return r.data;
     if (r.data?.code !== 'CONFLICT') return r.data;
   }
@@ -60,25 +60,58 @@ const trader = await login(env.SEED_TRADER_EMAIL, env.SEED_TRADER_PASSWORD);
 ok(player && admin && supervisor && compliance && trader, 'login de jugador, admin, supervisor, cumplimiento y trader');
 
 const games = (await call('GET', '/lottery/games')).data;
-const tepuy = games.find((g) => g.name.includes('Tepuy'));
-const sabana = games.find((g) => g.name.includes('Sabana'));
-ok(tepuy?.symbols.length === 38, 'juego Tepuy con 38 animales');
+ok(games.map((g) => g.code).join(',') === 'MER-05,MER-03,MER-01,MER-02,MER-04', 'cinco juegos activos: Animalitos, Frutas, Triple Andino, Kino Teleférico y Terminal Nevado');
+const merida = games.find((g) => g.code === 'MER-05');
+ok(
+  merida?.symbols.length === 70 &&
+    !merida.symbols.some((s) => s.number === '0') &&
+    merida.symbols.find((s) => s.number === '17')?.name === 'Colibrí' &&
+    merida.symbols.find((s) => s.number === '69')?.name === 'Mapache',
+  'MER-05 v2.0: catálogo 00–69 (70 animales, 17 = Colibrí, 69 = Mapache)',
+);
+ok(
+  merida?.schedule.map((x) => x.time).join(' ') === Array.from({ length: 12 }, (_, i) => `${String(9 + i).padStart(2, '0')}:00`).join(' '),
+  'MER-05: 12 sorteos diarios, uno por hora de 09:00 a 20:00',
+);
+ok(merida?.modalities.find((m) => m.code === 'EXACT')?.factor_x100 === '5000', 'MER-05: Animal exacto paga 50×');
+ok(
+  merida?.modalities.find((m) => m.code === 'EXACT')?.status === 'ACTIVE' &&
+    merida.modalities.filter((m) => m.status === 'PENDING_APPROVAL').length === 2,
+  'MER-05: solo Animal exacto activo; Combinada y Múltiple pendientes',
+);
+
+const paramo = games.find((g) => g.code === 'MER-03');
+ok(
+  paramo?.symbols.length === 70 &&
+    paramo.symbols.map((s) => s.number).join() === Array.from({ length: 70 }, (_, i) => String(i).padStart(2, '0')).join() &&
+    paramo.symbols.slice(0, 6).map((s) => s.name).join() === 'Mora,Durazno,Uva,Fresa,Manzana,Pera',
+  'MER-03: catálogo 00–69 (70 frutas, empieza por Mora, Durazno, Uva, Fresa, Manzana, Pera)',
+);
+ok(paramo?.schedule.map((x) => x.time).join(' ') === '09:30 13:30 18:30', 'MER-03: sorteos 09:30, 13:30 y 18:30');
+ok(
+  paramo?.modalities.map((m) => `${m.name}:${m.factor_x100}:${m.status}`).join() ===
+    'Fruta exacta:4000:ACTIVE,Combinada:7000:PENDING_APPROVAL,Triple frutal:100000:PENDING_APPROVAL',
+  'MER-03: Fruta exacta 40× activa; Combinada 70× y Triple frutal 1.000× pendientes',
+);
+
+const fut = (await call('GET', '/futures/contracts')).data;
+ok(fut?.length === 3 && fut.map((c) => c.symbol).join() === 'BTCUSDT,ETHUSDT,SOLUSDT', `Cumbre Futuros: BTC, ETH y SOL (${fut?.filter((c) => c.feed_ok).length ?? 0} con feed válido)`);
 
 const balanceOf = async (cur) => BigInt((await call('GET', '/me/balances', { token: player })).data.find((b) => b.currency === cur).cash);
 
 // Sorteo extraordinario con venta abierta (los horarios regulares pueden estar cerrados según la hora).
-const extra = await extraordinary(tepuy.id, supervisor);
-ok(extra?.id, 'supervisor crea sorteo extraordinario en Tepuy');
+const extra = await extraordinary(merida.id, supervisor, true);
+ok(extra?.id && extra.auto_rng === true, 'supervisor crea sorteo automático (RNG) en Mérida');
 
-const leon = tepuy.symbols.find((s) => s.name === 'León');
-const tigre = tepuy.symbols.find((s) => s.name === 'Tigre');
+const leon = merida.symbols.find((s) => s.name === 'León');
+const tigre = merida.symbols.find((s) => s.name === 'Tigre');
 const before = await balanceOf('VES');
 const key = randomUUID();
 const buy = () =>
   call('POST', '/lottery/tickets', {
     token: player,
     headers: { 'idempotency-key': key },
-    body: { gameId: tepuy.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: leon.id, amount: '10' }, { drawId: extra.id, symbolId: tigre.id, amount: '5.50' }] },
+    body: { gameId: merida.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: leon.id, amount: '10' }, { drawId: extra.id, symbolId: tigre.id, amount: '5.50' }] },
   });
 const [t1, t2] = await Promise.all([buy(), buy()]);
 ok(t1.status === 201 && t1.data.total === '1550', `ticket vendido (total 15.50 Bs) → ${t1.data.code}`);
@@ -88,11 +121,27 @@ ok((await balanceOf('VES')) === before - 1550n, 'saldo descontado una sola vez')
 const over = await call('POST', '/lottery/tickets', {
   token: player,
   headers: { 'idempotency-key': randomUUID() },
-  body: { gameId: tepuy.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: leon.id, amount: '5000' }] },
+  body: { gameId: merida.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: leon.id, amount: '5000' }] },
 });
 ok(over.data?.code === 'LIMIT_EXCEEDED', `límite por jugada rechazado (${over.data?.code})`);
 
-// Cupo por animal: 600.000 Bs de pasivo / 30 = 20.000 Bs apostables por animal y sorteo.
+// Cupo por animal: 600.000 Bs de pasivo / 50 = 12.000 Bs apostables por animal y sorteo.
+// El tope por jugador (Bs. 5.000) se levanta durante esta prueba y se restaura después.
+const limitsBefore = (await call('GET', `/admin/lottery/games/${merida.id}/config`, { token: admin })).data.limits.find((l) => l.currency === 'VES');
+const bs = (minor) => (minor === null ? null : (Number(minor) / 100).toString());
+const setVesLimits = (perPlayer) =>
+  call('PUT', `/admin/lottery/games/${merida.id}/limits`, {
+    token: supervisor,
+    body: {
+      currency: 'VES',
+      minPlay: bs(limitsBefore.min_play),
+      maxPlay: bs(limitsBefore.max_play),
+      maxTicket: bs(limitsBefore.max_ticket),
+      maxLiabilityPerSymbol: bs(limitsBefore.max_liability_per_symbol),
+      maxPlayerPerDraw: perPlayer,
+    },
+  });
+ok((await setVesLimits(null)).status === 200, 'configuración: operador quita el tope por jugador (temporal)');
 // Fondear al jugador con un depósito aprobado para poder llegar al cupo.
 const capDep = await call('POST', '/payments/deposits', {
   token: player,
@@ -101,34 +150,132 @@ const capDep = await call('POST', '/payments/deposits', {
 await call('POST', `/admin/payments/deposits/${capDep.data.id}/approve`, { token: admin });
 const capTickets = [];
 let capHit = null;
-for (let i = 0; i < 11 && !capHit; i++) {
+for (let i = 0; i < 8 && !capHit; i++) {
   const r = await call('POST', '/lottery/tickets', {
     token: player,
     headers: { 'idempotency-key': randomUUID() },
-    body: { gameId: tepuy.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: tepuy.symbols[5].id, amount: '2000' }] },
+    body: { gameId: merida.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: merida.symbols[5].id, amount: '2000' }] },
   });
   if (r.status === 201) capTickets.push(r.data.id);
   else capHit = r.data;
 }
-ok(capTickets.length === 10 && capHit?.code === 'LIMIT_EXCEEDED', `cupo por animal agotado tras 20.000 Bs (${capHit?.message})`);
+ok(capTickets.length === 6 && capHit?.code === 'LIMIT_EXCEEDED', `cupo por animal agotado tras 12.000 Bs (${capHit?.message})`);
 for (const id of capTickets) await call('POST', `/lottery/tickets/${id}/cancel`, { token: player });
 const freed = await call('POST', '/lottery/tickets', {
   token: player,
   headers: { 'idempotency-key': randomUUID() },
-  body: { gameId: tepuy.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: tepuy.symbols[5].id, amount: '1' }] },
+  body: { gameId: merida.id, currency: 'VES', plays: [{ drawId: extra.id, symbolId: merida.symbols[5].id, amount: '5' }] },
 });
 ok(freed.status === 201, 'anular tickets libera el cupo del animal');
 await call('POST', `/lottery/tickets/${freed.data.id}/cancel`, { token: player });
+const restored = await setVesLimits(bs(limitsBefore.max_player_per_draw));
+ok(restored.status === 200 && restored.data.max_player_per_draw === limitsBefore.max_player_per_draw, 'configuración: tope por jugador restaurado');
 
 const cancelled = await call('POST', `/lottery/tickets/${t1.data.id}/cancel`, { token: player });
 ok(cancelled.data?.status === 'CANCELLED', 'jugador anula su ticket dentro de la ventana');
 ok((await balanceOf('VES')) === before + 2_500_000n, 'anulaciones devuelven el saldo (saldo inicial + depósito de 25.000 Bs)');
 
+// ── Animalitos de Mérida (MER-05) ──
+const merExtra = await extraordinary(merida.id, supervisor);
+const colibri = merida.symbols.find((s) => s.number === '17');
+const merBuy = (plays) =>
+  call('POST', '/lottery/tickets', { token: player, headers: { 'idempotency-key': randomUUID() }, body: { gameId: merida.id, currency: 'VES', plays } });
+const combi = await merBuy([{ drawId: merExtra.id, symbolId: colibri.id, amount: '10', modality: 'COMBINADA' }]);
+ok(combi.data?.code === 'MODALITY_NOT_ACTIVE', `MER-05: Combinada rechazada hasta su aprobación (${combi.data?.code})`);
+const tooLow = await merBuy([{ drawId: merExtra.id, symbolId: colibri.id, amount: '4' }]);
+ok(tooLow.data?.code === 'LIMIT_EXCEEDED', 'MER-05: mínimo de Bs. 5 por jugada');
+const merT = await merBuy([{ drawId: merExtra.id, symbolId: colibri.id, amount: '10', modality: 'EXACT' }]);
+ok(
+  merT.status === 201 && merT.data.code.startsWith('DEMO-MER05-') && merT.data.is_demo && merT.data.rules_version === 'MER-05 v2.0-borrador',
+  `MER-05: ticket demo con versión de reglas → ${merT.data?.code}`,
+);
+ok(merT.data?.potential_win === '50000' && merT.data.plays[0].modality === 'EXACT', 'MER-05: exacto 17 Colibrí con Bs. 10 → premio Bs. 500 (50×)');
+// Tope por jugador y sorteo: Bs. 5.000 sumando todo lo que tiene abierto en ese sorteo.
+const [a1s, a2s, a3s] = merida.symbols.slice(0, 3);
+const capA = await merBuy([
+  { drawId: merExtra.id, symbolId: a1s.id, amount: '2000' },
+  { drawId: merExtra.id, symbolId: a2s.id, amount: '2000' },
+]);
+ok(capA.status === 201, 'MER-05: Bs. 4.010 abiertos en el sorteo (bajo el tope de Bs. 5.000 por jugador)');
+const capB = await merBuy([{ drawId: merExtra.id, symbolId: a3s.id, amount: '1000' }]);
+ok(capB.data?.code === 'LIMIT_EXCEEDED' && capB.data.details?.available === '99000', `MER-05: tope por jugador y sorteo (${capB.data?.message})`);
+const avail = await call('GET', `/lottery/draws/${merExtra.id}/availability?currency=VES`);
+ok(Array.isArray(avail.data?.soldOut) && avail.data.soldOut.length === 0, 'MER-05: disponibilidad pública sin animales agotados');
+const badCur = await call('GET', `/lottery/draws/${merExtra.id}/availability?currency=EUR`);
+ok(badCur.data?.code === 'INVALID_INPUT', 'MER-05: disponibilidad rechaza moneda inválida');
+await call('POST', `/lottery/tickets/${capA.data.id}/cancel`, { token: player });
+await call('POST', `/lottery/tickets/${merT.data.id}/cancel`, { token: player });
+ok((await balanceOf('VES')) === before + 2_500_000n, 'MER-05: anulación devuelve el saldo');
+// Sorteo manual sin jugadas: anularlo para no dejarlo pendiente de acta en el backoffice.
+const merCancel = await call('POST', `/admin/lottery/draws/${merExtra.id}/cancel`, { token: supervisor, body: { reason: 'Sorteo de prueba automática' } });
+ok(merCancel.data?.status === 'CANCELLED', 'MER-05: anular un sorteo lo registra como incidencia');
+
+// ── Frutas del Páramo (MER-03) ──
+const fruExtra = await extraordinary(paramo.id, supervisor, true);
+const mora = paramo.symbols.find((s) => s.number === '00');
+const fruBuy = (plays) =>
+  call('POST', '/lottery/tickets', { token: player, headers: { 'idempotency-key': randomUUID() }, body: { gameId: paramo.id, currency: 'VES', plays } });
+const fruCombi = await fruBuy([{ drawId: fruExtra.id, symbolId: mora.id, amount: '10', modality: 'COMBINADA' }]);
+ok(fruCombi.data?.code === 'MODALITY_NOT_ACTIVE', 'MER-03: Combinada rechazada hasta su aprobación');
+const fruT = await fruBuy([{ drawId: fruExtra.id, symbolId: mora.id, amount: '10' }]);
+ok(
+  fruT.status === 201 && fruT.data.code.startsWith('DEMO-MER03-') && fruT.data.rules_version === 'MER-03 v1.0-borrador' && fruT.data.potential_win === '40000',
+  `MER-03: fruta exacta 00 Mora con Bs. 10 → premio Bs. 400 (40×) · ${fruT.data?.code}`,
+);
+const wrongGame = await fruBuy([{ drawId: merExtra.id, symbolId: mora.id, amount: '10' }]);
+ok(wrongGame.status >= 400, `MER-03: no acepta jugadas en sorteos de otro juego (${wrongGame.data?.code})`);
+await call('POST', `/lottery/tickets/${fruT.data.id}/cancel`, { token: player });
+ok((await balanceOf('VES')) === before + 2_500_000n, 'MER-03: anulación devuelve el saldo');
+const fruCancel = await call('POST', `/admin/lottery/draws/${fruExtra.id}/cancel`, { token: supervisor, body: { reason: 'Sorteo de prueba automática' } });
+ok(fruCancel.data?.status === 'CANCELLED', 'MER-03: sorteo de prueba anulado');
+
+// ── Simulador (recarga de prueba + sorteo privado al instante) ──
+const simStatus = (await call('GET', '/simulation/status')).data;
+ok(simStatus?.enabled === true, 'simulador activo en desarrollo');
+const preSim = await balanceOf('VES');
+const top = await call('POST', '/simulation/topup', { token: player, body: { currency: 'VES', amount: '1000' }, headers: { 'idempotency-key': randomUUID() } });
+ok(top.status === 201 && (await balanceOf('VES')) === preSim + 100000n, 'simulador: recarga de prueba de Bs. 1.000 por el ledger');
+const topBig = await call('POST', '/simulation/topup', { token: player, body: { currency: 'VES', amount: '20000' }, headers: { 'idempotency-key': randomUUID() } });
+ok(topBig.data?.code === 'LIMIT_EXCEEDED', 'simulador: recarga sobre el máximo rechazada');
+const simDraw = (await call('POST', `/simulation/games/${merida.id}/draw`, { token: player })).data;
+const simAgain = (await call('POST', `/simulation/games/${merida.id}/draw`, { token: player })).data;
+ok(simDraw?.status === 'OPEN' && simAgain?.id === simDraw.id, 'simulador: un sorteo privado abierto por jugador y juego');
+const pubDraws = (await call('GET', `/lottery/games/${merida.id}/draws`)).data;
+ok(!pubDraws.some((d) => d.id === simDraw.id), 'simulador: el sorteo privado no aparece en la lista pública');
+const simEmpty = await call('POST', `/simulation/draws/${simDraw.id}/run`, { token: player });
+ok(simEmpty.data?.code === 'INVALID_INPUT', 'simulador: no se sortea sin jugadas');
+const realOpen = pubDraws.find((d) => d.status === 'OPEN' && new Date(d.close_at) > new Date());
+if (realOpen) {
+  const mixed = await merBuy([
+    { drawId: simDraw.id, symbolId: colibri.id, amount: '5' },
+    { drawId: realOpen.id, symbolId: colibri.id, amount: '5' },
+  ]);
+  ok(mixed.data?.code === 'INVALID_INPUT', 'simulador: un ticket no mezcla sorteo privado con sorteos reales');
+}
+// Cubrir los 70 animales con Bs. 5: gana exactamente uno y paga 50× → Bs. 250.
+const allIn = await merBuy(merida.symbols.map((sym) => ({ drawId: simDraw.id, symbolId: sym.id, amount: '5' })));
+ok(allIn.status === 201 && allIn.data.is_simulation === true, `simulador: ticket con los 70 animales → ${allIn.data?.code}`);
+const simRun = await call('POST', `/simulation/draws/${simDraw.id}/run`, { token: player });
+ok(
+  simRun.status === 200 && simRun.data.plays.filter((p) => p.status === 'WON').length === 1 && simRun.data.won_amount.VES === '25000',
+  `simulador: salió ${simRun.data?.result?.number} ${simRun.data?.result?.name}; una jugada gana Bs. 250 (50×)`,
+);
+ok((await balanceOf('VES')) === preSim + 100000n - 35000n + 25000n, 'simulador: saldo = recarga − Bs. 350 apostados + Bs. 250 de premio');
+const simVerify = (await call('GET', `/lottery/draws/${simDraw.id}/verify`)).data;
+ok(
+  simVerify?.hashMatches === true && simVerify.symbols === 70 && simVerify.computedSymbol?.id === simRun.data.result.id,
+  'simulador: el resultado es verificable con la semilla comprometida (mód. 70)',
+);
+const simTwice = await call('POST', `/simulation/draws/${simDraw.id}/run`, { token: player });
+ok(simTwice.data?.code === 'INVALID_STATE', 'simulador: un sorteo no se puede volver a sortear');
+const simNext = (await call('POST', `/simulation/games/${merida.id}/draw`, { token: player })).data;
+ok(simNext?.id && simNext.id !== simDraw.id, 'simulador: «siguiente sorteo» crea uno nuevo');
+
 // Ticket que se queda para el sorteo
 const keep = await call('POST', '/lottery/tickets', {
   token: player,
   headers: { 'idempotency-key': randomUUID() },
-  body: { gameId: tepuy.id, currency: 'USDT', plays: tepuy.symbols.slice(0, 3).map((s) => ({ drawId: extra.id, symbolId: s.id, amount: '1' })) },
+  body: { gameId: merida.id, currency: 'USDT', plays: merida.symbols.slice(0, 3).map((s) => ({ drawId: extra.id, symbolId: s.id, amount: '1' })) },
 });
 ok(keep.status === 201, `ticket USDT con 3 animales → ${keep.data?.code}`);
 
@@ -215,7 +362,12 @@ staffSocket.close();
 
 // ───────────── Deportes ─────────────
 console.log('\n— Deportes');
-const catalog = (await call('GET', '/sports/catalog')).data;
+const catalogRes = await call('GET', '/sports/catalog');
+if (catalogRes.status === 404) {
+  console.log('  (deportes en pausa: SPORTS_ENABLED=false, se omite)');
+  ok((await call('GET', '/admin/sports/events', { token: admin })).status === 404, 'deportes apagado: el backoffice tampoco lo expone');
+} else {
+const catalog = catalogRes.data;
 const futve = catalog.competitions.find((c) => c.name === 'Liga FUTVE');
 const lvbp = catalog.competitions.find((c) => c.name === 'LVBP');
 const inOneHour = new Date(Date.now() + 3_600_000).toISOString();
@@ -313,6 +465,7 @@ ok(
 await call('POST', `/admin/sports/events/${ev2.data.id}/cancel`, { token: trader, body: { reason: 'Evento de prueba automática' } });
 ok((await balanceOf('VES')) === preSports + 17100n, 'saldo: −150 Bs apostados + 321 Bs en premios = +171 Bs');
 lobby.close();
+}
 
 const recon = (await call('GET', '/admin/ledger/reconcile', { token: admin })).data;
 ok(recon.ok, 'ledger cuadrado (Σ D = Σ C, saldos = suma de asientos)');
@@ -320,32 +473,46 @@ const chain = (await call('GET', '/admin/audit/verify', { token: admin })).data;
 ok(chain.ok, `cadena de auditoría íntegra (${chain.checked} registros)`);
 
 if (process.argv.includes('--wait')) {
-  const manual = await extraordinary(sabana.id, supervisor);
-  const toro = sabana.symbols.find((s) => s.name === 'Toro');
-  const m = await call('POST', '/lottery/tickets', {
+  const merDraw = await extraordinary(merida.id, supervisor);
+  const merCol = merida.symbols.find((s) => s.number === '17');
+  const mt = await call('POST', '/lottery/tickets', {
     token: player,
     headers: { 'idempotency-key': randomUUID() },
-    body: { gameId: sabana.id, currency: 'VES', plays: [{ drawId: manual.id, symbolId: toro.id, amount: '20' }] },
+    body: { gameId: merida.id, currency: 'VES', plays: [{ drawId: merDraw.id, symbolId: merCol.id, amount: '10' }] },
   });
-  ok(m.status === 201, 'ticket en sorteo de resultado manual');
-  const preWin = await balanceOf('VES');
+  ok(mt.status === 201, 'MER-05: ticket para el flujo con acta');
 
   console.log('… esperando a que pasen los sorteos extraordinarios');
-  const latest = Math.max(new Date(extra.draw_at).getTime(), new Date(manual.draw_at).getTime());
+  const latest = Math.max(new Date(extra.draw_at).getTime(), new Date(merDraw.draw_at).getTime());
   await sleep(Math.max(latest - Date.now(), 0) + 30_000);
-  const draws = (await call('GET', `/lottery/games/${tepuy.id}/draws`)).data;
+  const draws = (await call('GET', `/lottery/games/${merida.id}/draws`)).data;
   const done = draws.find((d) => d.id === extra.id);
-  ok(done.status === 'SETTLED', `sorteo RNG liquidado: salió ${done.result_number} ${done.result_name}`);
+  ok(done?.status === 'SETTLED', `sorteo automático liquidado sin intervención: salió ${done?.result_number} ${done?.result_name}`);
   const v = (await call('GET', `/lottery/draws/${extra.id}/verify`)).data;
-  ok(v.hashMatches && v.resultMatches, 'verificación provably fair coincide con el resultado');
+  ok(v.hashMatches && v.resultMatches && v.symbols === 70, 'verificación provably fair coincide con el resultado (mód. 70)');
   const kt = (await call('GET', `/lottery/tickets/${keep.data.code}`, { token: player })).data;
   ok(['WON', 'LOST'].includes(kt.status), `ticket USDT liquidado → ${kt.status} (premio ${kt.total_win})`);
 
-  await call('POST', `/admin/lottery/draws/${manual.id}/propose-result`, { token: admin, body: { symbolId: toro.id, evidence: 'Acta de prueba #1' } });
-  const self = await call('POST', `/admin/lottery/draws/${manual.id}/confirm-result`, { token: admin });
+  // MER-05: preliminar público → sin acta no hay oficial → acta → 4 ojos → oficial y premio.
+  const preMer = await balanceOf('VES');
+  await call('POST', `/admin/lottery/draws/${merDraw.id}/propose-result`, { token: admin, body: { symbolId: merCol.id, evidence: 'Transmisión del sorteo' } });
+  const pub = (await call('GET', `/lottery/games/${merida.id}/draws`)).data.find((d) => d.id === merDraw.id);
+  ok(pub.preliminary_number === '17' && pub.result_number === null, 'MER-05: resultado preliminar publicado, aún no oficial');
+  const noRec = await call('POST', `/admin/lottery/draws/${merDraw.id}/confirm-result`, { token: supervisor });
+  ok(noRec.data?.code === 'RECORD_REQUIRED', 'MER-05: no se confirma sin acta');
+  const fd = new FormData();
+  fd.append('recordNumber', 'ACTA-PRUEBA-1');
+  fd.append('executor', 'Ejecutor de prueba');
+  fd.append('inspector', 'Fiscal de prueba');
+  fd.append('file', new Blob([Buffer.from('%PDF-1.4\n% acta de prueba\n')], { type: 'application/pdf' }), 'acta.pdf');
+  const recRes = await fetch(`${API}/admin/lottery/draws/${merDraw.id}/record`, { method: 'POST', headers: { authorization: `Bearer ${supervisor}` }, body: fd });
+  ok(recRes.status === 201, 'MER-05: acta registrada con archivo cifrado');
+  const fileRes = await fetch(`${API}/admin/lottery/draws/${merDraw.id}/record/file`, { headers: { authorization: `Bearer ${admin}` } });
+  ok(fileRes.status === 200 && (await fileRes.text()).startsWith('%PDF'), 'MER-05: el acta se descifra íntegra');
+  const self = await call('POST', `/admin/lottery/draws/${merDraw.id}/confirm-result`, { token: admin });
   ok(self.data?.code === 'FOUR_EYES_REQUIRED', 'quien carga el resultado no puede confirmarlo');
-  await call('POST', `/admin/lottery/draws/${manual.id}/confirm-result`, { token: supervisor });
-  ok((await balanceOf('VES')) === preWin + 60000n, 'resultado manual confirmado por otro usuario y premio 30× acreditado (600 Bs)');
+  await call('POST', `/admin/lottery/draws/${merDraw.id}/confirm-result`, { token: supervisor });
+  ok((await balanceOf('VES')) === preMer + 50000n, 'MER-05: resultado oficial con acta y premio 50× acreditado (500 Bs)');
 
   const recon2 = (await call('GET', '/admin/ledger/reconcile', { token: admin })).data;
   ok(recon2.ok, 'ledger cuadrado tras liquidaciones');

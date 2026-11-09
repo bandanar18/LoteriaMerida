@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fairIndex, hashSeed, newServerSeed } from '@loteria/domain';
+import { fairIndex, fairSample, hashSeed, newServerSeed } from '@loteria/domain';
 import { randomInt } from 'crypto';
 import { Db } from '../common/db.service';
 
@@ -21,6 +21,16 @@ export class RngService {
     await db.query(
       `INSERT INTO rng.rng_call (consumer, ref_id, method, range_n, result, seed_hash) VALUES ($1, $2, $3, $4, $5, $6)`,
       [args.consumer, args.refId, 'HMAC_SHA256_COMMITTED_SEED', args.n, result, hashSeed(args.serverSeed)],
+    );
+    return result;
+  }
+
+  /** k índices distintos de [0, n) en orden de extracción, derivados de una semilla comprometida (Kino). */
+  async sampleFromCommitment(db: Db, args: { consumer: string; refId: string; serverSeed: string; n: number; k: number }): Promise<number[]> {
+    const result = fairSample(args.serverSeed, args.refId, args.n, args.k);
+    await db.query(
+      `INSERT INTO rng.rng_call (consumer, ref_id, method, range_n, result, seed_hash) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [args.consumer, args.refId, `HMAC_SHA256_COMMITTED_SEED_SAMPLE_${args.k}`, args.n, result[0], hashSeed(args.serverSeed)],
     );
     return result;
   }

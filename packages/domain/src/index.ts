@@ -4,3 +4,4 @@ export * from './lottery';
 export * from './identity';
 export * from './kyc';
 export * from './sports';
+export * from './futures';

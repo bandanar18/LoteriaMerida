@@ -41,3 +41,15 @@ export function verifyDraw(serverSeedHex: string, publishedHash: string, message
   const seedHash = hashSeed(serverSeedHex);
   return { seedHash, hashMatches: seedHash === publishedHash, index: fairIndex(serverSeedHex, message, n) };
 }
+
+/**
+ * k valores distintos de [0, n) en orden de extracción (sin reposición), derivados de (seed, message).
+ * Bola i: índice uniforme entre los que quedan, con HMAC-SHA256(seed, "<message>#<i>:<contador>").
+ */
+export function fairSample(serverSeedHex: string, message: string, n: number, k: number): number[] {
+  if (!Number.isInteger(k) || k < 1 || k > n) throw new Error('k fuera de rango');
+  const pool = Array.from({ length: n }, (_, i) => i);
+  const out: number[] = [];
+  for (let i = 0; i < k; i++) out.push(pool.splice(fairIndex(serverSeedHex, `${message}#${i}`, pool.length), 1)[0]);
+  return out;
+}

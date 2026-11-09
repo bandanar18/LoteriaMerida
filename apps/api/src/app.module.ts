@@ -12,6 +12,7 @@ import { AuthService } from './identity/auth.service';
 import { KycStorageService } from './kyc/kyc-storage.service';
 import { KycController } from './kyc/kyc.controller';
 import { KycService } from './kyc/kyc.service';
+import { FuturesModule } from './futures/futures.module';
 import { LotteryModule } from './lottery/lottery.module';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 import { SportsModule } from './sports/sports.module';
@@ -26,7 +27,9 @@ import { WalletController } from './wallet/wallet.controller';
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     LotteryModule,
-    SportsModule,
+    FuturesModule,
+    // Deportes en pausa (SPORTS_ENABLED=false): el código y los datos se conservan para reactivarlo.
+    ...(config.sportsEnabled ? [SportsModule] : []),
   ],
   controllers: [AuthController, WalletController, PaymentsController, PaymentsAdminController, AdminController, KycController],
   providers: [

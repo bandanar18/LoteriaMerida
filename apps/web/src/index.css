@@ -21,6 +21,8 @@ body,
 
 body {
   background: #f3f5f2;
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
   color: #12201a;
   -webkit-tap-highlight-color: transparent;
 }
@@ -44,7 +46,7 @@ body {
   @apply btn bg-red-600 text-white hover:bg-red-500;
 }
 @utility input {
-  @apply w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-selva-600 focus:ring-2 focus:ring-selva-600/20;
+  @apply w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-base outline-none sm:text-sm focus:border-selva-600 focus:ring-2 focus:ring-selva-600/20;
 }
 @utility label {
   @apply mb-1 block text-xs font-medium text-black/60;
@@ -63,4 +65,59 @@ body {
   .table-base td {
     @apply border-b border-black/5 px-3 py-2 align-top;
   }
+}
+
+/* Mobile-first: la mayoría de jugadores entra desde el teléfono (docs/Animalitos_de_Merida_MER-05.md §14). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* Objetivos táctiles cómodos en pantallas táctiles. */
+@media (pointer: coarse) {
+  button,
+  a,
+  select {
+    touch-action: manipulation;
+  }
+}
+
+/* ───────── Backoffice: paleta sobria (las páginas del admin heredan estos tokens sin cambiar su código) ───────── */
+.admin-theme {
+  --color-selva-950: #0b1220;
+  --color-selva-900: #0f172a;
+  --color-selva-800: #1e3a8a;
+  --color-selva-700: #1e40af;
+  --color-selva-600: #1d4ed8;
+  --color-selva-500: #3b82f6;
+  --color-oro-300: #fde68a;
+  --color-oro-400: #f5c451;
+  --color-oro-500: #d99a0b;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  color: #0f172a;
+}
+.admin-theme .card {
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.04);
+  --tw-ring-color: rgb(15 23 42 / 0.07);
+}
+.admin-theme .btn {
+  border-radius: 0.625rem;
+}
+.admin-theme .input {
+  border-radius: 0.625rem;
+}
+.admin-theme main h1 {
+  letter-spacing: -0.015em;
+}
+.admin-theme .table-base th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.admin-theme .table-base tbody tr:hover td {
+  background: #f8fafc;
 }

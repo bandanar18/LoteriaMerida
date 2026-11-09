@@ -4,8 +4,17 @@ import { Db } from '../common/db.service';
 import { BusinessError, pgErrorCode } from '../common/errors';
 import { publish } from '../common/realtime';
 
-export type AccountType = 'PLAYER_CASH' | 'PLAYER_LOCKED' | 'BETS_IN_PLAY' | 'HOUSE_GGR' | 'PAYMENT_CLEARING';
-export type RefProduct = 'LOTTERY' | 'SPORTS' | 'PAYMENT' | 'ADJUST';
+export type AccountType =
+  | 'PLAYER_CASH'
+  | 'PLAYER_LOCKED'
+  | 'BETS_IN_PLAY'
+  | 'HOUSE_GGR'
+  | 'PAYMENT_CLEARING'
+  | 'PLAYER_FUTURES'
+  | 'FUTURES_MARGIN'
+  | 'HOUSE_FUTURES_FEES'
+  | 'HOUSE_FUTURES_PNL';
+export type RefProduct = 'LOTTERY' | 'SPORTS' | 'PAYMENT' | 'ADJUST' | 'FUTURES';
 
 export interface AccountSpec {
   ownerType: 'PLAYER' | 'HOUSE';
@@ -63,7 +72,12 @@ export class LedgerService {
     return this.account(db, { ownerType: 'PLAYER', ownerId: playerId, accountType: 'PLAYER_LOCKED', currency });
   }
 
-  house(db: Db, accountType: Exclude<AccountType, 'PLAYER_CASH' | 'PLAYER_LOCKED'>, product: string, currency: CurrencyCode) {
+  /** Cuenta propia del jugador de cualquier tipo (billetera de futuros, margen…). */
+  playerAccount(db: Db, playerId: string, accountType: AccountType, currency: CurrencyCode) {
+    return this.account(db, { ownerType: 'PLAYER', ownerId: playerId, accountType, currency });
+  }
+
+  house(db: Db, accountType: Exclude<AccountType, 'PLAYER_CASH' | 'PLAYER_LOCKED' | 'PLAYER_FUTURES' | 'FUTURES_MARGIN'>, product: string, currency: CurrencyCode) {
     return this.account(db, { ownerType: 'HOUSE', accountType, product, currency });
   }
 

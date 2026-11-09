@@ -5,9 +5,9 @@ import { useBalances, usePlatform } from '../lib/queries';
 import { LiveDot } from '../lib/realtime';
 
 const NAV = [
-  { to: '/', label: 'Animalitos', icon: '🦁', end: true },
-  { to: '/deportes', label: 'Deportes', icon: '⚽' },
-  { to: '/tickets', label: 'Mis jugadas', icon: '🎟️' },
+  { to: '/', label: 'Jugar', icon: '🎲', end: true },
+  { to: '/futuros', label: 'Futuros', icon: '📈' },
+  { to: '/tickets', label: 'Jugadas', icon: '🎟️' },
   { to: '/resultados', label: 'Resultados', icon: '📋' },
   { to: '/billetera', label: 'Billetera', icon: '💰' },
   { to: '/cuenta', label: 'Cuenta', icon: '👤' },
@@ -20,12 +20,12 @@ export function PlayerLayout() {
   const platform = usePlatform();
 
   return (
-    <div className="flex min-h-screen flex-col pb-20 md:pb-0">
+    <div className="flex min-h-dvh flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
       <header className="sticky top-0 z-40 bg-selva-800 text-white shadow">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5 sm:gap-3 sm:py-3">
+          <Link to="/" className="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight">
             <span className="text-2xl">🦁</span>
-            <span>
+            <span className="hidden min-[400px]:inline">
               Tepuy<span className="text-oro-400">Apuestas</span>
             </span>
           </Link>
@@ -84,13 +84,13 @@ export function PlayerLayout() {
         <p className="mt-1">Solo mayores de 18 años · Juega con responsabilidad · Horario: America/Caracas</p>
       </footer>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-black/10 bg-white md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         {NAV.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
             end={n.end}
-            className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-[10px] ${isActive ? 'font-semibold text-selva-700' : 'text-black/50'}`}
+            className={({ isActive }) => `flex h-14 flex-col items-center justify-center gap-0.5 text-[10px] leading-tight ${isActive ? 'font-semibold text-selva-700' : 'text-black/50'}`}
           >
             <span className="text-lg leading-none">{n.icon}</span>
             {n.label}

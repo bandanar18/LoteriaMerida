@@ -3,6 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBox } from '../components/ui';
 import { useAuth } from '../lib/auth';
 
+declare const __DEV_LOGINS__: { label: string; email: string; password: string }[];
+/** Inyectado por vite.config.ts solo en `vite dev` (vacío en producción). */
+const DEV_LOGINS = import.meta.env.DEV ? __DEV_LOGINS__ : [];
+
 export function LoginPage() {
   const { login } = useAuth();
   const nav = useNavigate();
@@ -43,6 +47,27 @@ export function LoginPage() {
         <button className="btn-primary w-full" disabled={busy}>
           {busy ? 'Entrando…' : 'Entrar'}
         </button>
+        {DEV_LOGINS.length > 0 && (
+          <div className="rounded-xl border border-dashed border-oro-400 bg-oro-400/10 p-3">
+            <p className="mb-2 text-xs font-semibold text-black/60">Solo en desarrollo · usuarios de prueba</p>
+            <div className="grid grid-cols-2 gap-2">
+              {DEV_LOGINS.map((l) => (
+                <button
+                  key={l.label}
+                  type="button"
+                  className="btn bg-white text-selva-900 ring-1 ring-black/10"
+                  onClick={() => {
+                    setEmail(l.email);
+                    setPassword(l.password);
+                    setError(null);
+                  }}
+                >
+                  {l.label === 'Administrador' ? '🛠️' : '🎮'} {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <p className="text-center text-sm text-black/60">
           ¿No tienes cuenta?{' '}
           <Link to="/registro" className="font-semibold text-selva-700">

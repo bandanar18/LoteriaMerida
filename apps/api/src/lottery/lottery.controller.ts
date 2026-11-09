@@ -21,6 +21,13 @@ export class LotteryController {
   }
 
   @Public()
+  @Get('draws/:id/availability')
+  availability(@Param('id', ParseUUIDPipe) id: string, @Query('currency') currency?: string) {
+    if (currency !== 'VES' && currency !== 'USDT') throw new BusinessError('INVALID_INPUT', 'Moneda inválida');
+    return this.lottery.drawAvailability(id, currency);
+  }
+
+  @Public()
   @Get('draws/:id/verify')
   verify(@Param('id', ParseUUIDPipe) id: string) {
     return this.lottery.verifyDraw(id);

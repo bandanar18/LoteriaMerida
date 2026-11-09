@@ -8,6 +8,8 @@
     "start": "node dist/main.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "simulate:history": "tsx src/db/simulate-history.ts",
+    "simulate:market": "tsx src/db/simulate-market.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -52,8 +52,8 @@ export function dateTime(iso: string) {
   }).format(new Date(iso));
 }
 
-export function todayCaracas() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
+export function todayCaracas(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(date);
 }
 
 /** Reloj sincronizado con el servidor (el cierre de venta lo decide el servidor, esto solo es visual). */

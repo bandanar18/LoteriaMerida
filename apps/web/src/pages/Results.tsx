@@ -1,68 +1,81 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Empty, Modal, PageTitle, Spinner, StatusBadge } from '../components/ui';
+import { ReactNode, useState } from 'react';
+import { DayGrid, LatestAndNext, longDate, shiftDate, useRecentDraws } from '../components/ResultsBoard';
+import { Empty, ErrorBox, Modal, PageTitle, Spinner } from '../components/ui';
 import { get } from '../lib/api';
-import { DRAW_STATUS_LABEL, hour, todayCaracas } from '../lib/format';
-import { useDraws, useGames } from '../lib/queries';
+import { todayCaracas } from '../lib/format';
+import { Draw, symbolWords, useDraws, useGames } from '../lib/queries';
 
 export function ResultsPage() {
   const games = useGames();
   const [gameId, setGameId] = useState<string>();
-  const [date, setDate] = useState(todayCaracas());
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const game = games.data?.find((g) => g.id === gameId) ?? games.data?.[0];
-  const draws = useDraws(game?.id, date);
+  const recent = useRecentDraws(game);
+  const tomorrowAutomatic = recent.tomorrowDraws.data?.filter((d) => d.is_automatic) ?? [];
+  const [otherDate, setOtherDate] = useState(() => shiftDate(todayCaracas(), -2));
+  const other = useDraws(game?.id, otherDate);
+
+  if (games.isLoading) return <Spinner />;
+  if (!game) return <Empty>No hay juegos disponibles.</Empty>;
 
   return (
-    <div>
-      <PageTitle
-        actions={
-          <div className="flex gap-2">
-            <select className="input w-auto" value={game?.id} onChange={(e) => setGameId(e.target.value)}>
-              {games.data?.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            <input type="date" className="input w-auto" value={date} max={todayCaracas()} onChange={(e) => setDate(e.target.value)} />
-          </div>
-        }
-      >
-        Resultados
-      </PageTitle>
-      {draws.isLoading ? (
-        <Spinner />
-      ) : !draws.data?.length ? (
-        <Empty>No hay sorteos para esta fecha.</Empty>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {draws.data.map((d) => (
-            <div key={d.id} className="card flex flex-col items-center p-4 text-center">
-              <div className="text-sm font-bold text-selva-900">
-                {hour(d.draw_at)} {d.is_extraordinary && '⭐'}
-              </div>
-              {d.result_number ? (
-                <>
-                  <div className="my-2 text-5xl">{d.result_emoji}</div>
-                  <div className="font-bold">
-                    {d.result_number} · {d.result_name}
-                  </div>
-                </>
-              ) : (
-                <div className="my-4">
-                  <StatusBadge status={d.status} label={DRAW_STATUS_LABEL[d.status]} />
-                </div>
-              )}
-              <button className="mt-2 text-xs text-selva-700 underline-offset-2 hover:underline" onClick={() => setVerifyId(d.id)}>
-                {d.server_seed ? 'Verificar resultado' : 'Ver compromiso'}
-              </button>
-            </div>
+    <div className="space-y-4">
+      <PageTitle>Resultados</PageTitle>
+      {games.data!.length > 1 && (
+        <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
+          {games.data!.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setGameId(g.id)}
+              className={`btn shrink-0 snap-start ${g.id === game.id ? 'bg-selva-800 text-white' : 'bg-white text-selva-900 ring-1 ring-black/10'}`}
+            >
+              {g.name}
+            </button>
           ))}
         </div>
       )}
-      <p className="mt-6 text-xs text-black/40">
-        Las estadísticas y resultados anteriores no influyen en los sorteos futuros: cada animal tiene siempre 1 en 38 de probabilidad.
+
+      <LatestAndNext latest={recent.latest} next={recent.next} now={recent.now} />
+
+      <Day title="Hoy" date={recent.today} draws={recent.todayDraws.data} loading={recent.todayDraws.isLoading} latestId={recent.latest?.id} nextId={recent.next?.id} onVerify={setVerifyId} />
+      {tomorrowAutomatic.length > 0 && (
+        <Day title="Automáticos de mañana" date={recent.tomorrow} draws={tomorrowAutomatic} nextId={recent.next?.id} onVerify={setVerifyId} />
+      )}
+      <Day title="Ayer" date={recent.yesterday} draws={recent.yesterdayDraws.data} loading={recent.yesterdayDraws.isLoading} latestId={recent.latest?.id} onVerify={setVerifyId} />
+
+      <section>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-selva-900">Otra fecha</h2>
+          <div className="flex items-center gap-1">
+            <button className="btn-ghost px-3" aria-label="Día anterior" onClick={() => setOtherDate(shiftDate(otherDate, -1))}>
+              ‹
+            </button>
+            <input
+              type="date"
+              className="input w-auto"
+              value={otherDate}
+              max={todayCaracas()}
+              onChange={(e) => e.target.value && setOtherDate(e.target.value)}
+              aria-label="Fecha"
+            />
+            <button
+              className="btn-ghost px-3"
+              aria-label="Día siguiente"
+              disabled={otherDate >= todayCaracas()}
+              onClick={() => setOtherDate(shiftDate(otherDate, 1))}
+            >
+              ›
+            </button>
+          </div>
+        </div>
+        <p className="mb-2 text-xs text-black/50 first-letter:uppercase">{longDate(otherDate)}</p>
+        {other.isLoading ? <Spinner /> : !other.data?.length ? <Empty>No hay sorteos para esta fecha.</Empty> : <DayGrid draws={other.data} onVerify={setVerifyId} />}
+      </section>
+
+      <p className="text-xs text-black/40">
+        Toca un resultado para verificarlo. Los resultados anteriores no influyen en los sorteos futuros: {symbolWords(game).every} tiene siempre {game.draw_count > 1 ? game.draw_count : 1} en{' '}
+        {game.symbols.length} de probabilidad{game.draw_count > 1 ? ` (salen ${game.draw_count} por sorteo)` : ''}.
       </p>
       <Modal open={!!verifyId} onClose={() => setVerifyId(null)} title="Verificación del sorteo">
         {verifyId && <Verify drawId={verifyId} />}
@@ -71,12 +84,52 @@ export function ResultsPage() {
   );
 }
 
+function Day(props: {
+  title: ReactNode;
+  date: string;
+  draws?: Draw[];
+  loading?: boolean;
+  latestId?: string;
+  nextId?: string;
+  onVerify: (id: string) => void;
+}) {
+  const draws = props.draws ?? [];
+  const done = draws.filter((d) => d.result_number || d.preliminary_number).length;
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold text-selva-900">
+          {props.title} <span className="text-sm font-normal text-black/50">· {longDate(props.date)}</span>
+        </h2>
+        {draws.length > 0 && (
+          <span className="shrink-0 text-xs text-black/45 tabular-nums">
+            {done}/{draws.length} sorteos
+          </span>
+        )}
+      </div>
+      {props.loading ? (
+        <Spinner />
+      ) : draws.length === 0 ? (
+        <Empty>No hay sorteos para esta fecha.</Empty>
+      ) : (
+        <DayGrid draws={draws} latestId={props.latestId} nextId={props.nextId} onVerify={props.onVerify} />
+      )}
+    </section>
+  );
+}
+
 function Verify({ drawId }: { drawId: string }) {
-  const v = useQuery({ queryKey: ['verify', drawId], queryFn: () => get(`/lottery/draws/${drawId}/verify`) });
-  if (v.isLoading) return <Spinner />;
+  const v = useQuery({
+    queryKey: ['verify', drawId],
+    queryFn: () => get(`/lottery/draws/${drawId}/verify`),
+    refetchInterval: (q) => q.state.data?.revealed ? false : 15_000,
+  });
+  if (v.error) return <ErrorBox error={v.error} />;
+  if (!v.data) return <Spinner />;
   const d = v.data.draw;
   return (
     <div className="space-y-3 text-sm">
+      {d.is_automatic && <p className="font-semibold text-sky-800">Sorteo automático</p>}
       <p className="text-black/60">
         Antes de abrir la venta publicamos el <b>hash SHA-256</b> de una semilla secreta. Cuando hay resultado revelamos la semilla para que
         puedas comprobar que no fue cambiada.

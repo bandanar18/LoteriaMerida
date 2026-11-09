@@ -11,7 +11,7 @@ import { syncServerClock } from './format';
  */
 const EVENT_KEYS: Record<string, (data: any) => QueryKey[]> = {
   // Público (lobby)
-  draw: (d) => [['draws', d.gameId], ['admin', 'draws'], ['admin', 'dashboard'], ['tickets']],
+  draw: (d) => [['draws', d.gameId], ['verify', d.id], ['admin', 'draws'], ['admin', 'dashboard'], ['admin', 'next-band', d.gameId], ['tickets']],
   sports: () => [['sports'], ['admin', 'sports']],
   odds: () => [['sports', 'events'], ['admin', 'sports']],
   // Jugador

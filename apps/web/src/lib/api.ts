@@ -84,7 +84,9 @@ export async function api<T = any>(
 }
 
 export const get = <T = any>(path: string) => api<T>('GET', path);
+export const put = <T = any>(path: string, body?: unknown) => api<T>('PUT', path, { body: body ?? {} });
 export const post = <T = any>(path: string, body?: unknown, headers?: Record<string, string>) =>
   api<T>('POST', path, { body: body ?? {}, headers });
+export const del = <T = any>(path: string) => api<T>('DELETE', path);
 /** Descarga autenticada (p. ej. documentos KYC) como Blob. */
 export const getBlob = (path: string) => api<Blob>('GET', path, { raw: true });
