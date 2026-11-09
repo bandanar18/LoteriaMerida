@@ -199,10 +199,10 @@ export function AdminLayout() {
   const sidebar = (mini: boolean) => (
     <div className="flex h-full flex-col bg-[#0b1220] text-slate-300">
       <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] ${mini ? 'justify-center px-2' : 'px-5'}`}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 text-lg shadow-inner">🦁</span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 text-lg shadow-inner">🍀</span>
         {!mini && (
           <div className="leading-tight">
-            <p className="text-sm font-bold tracking-tight text-white">Tepuy</p>
+            <p className="text-sm font-bold tracking-tight text-white">FortunaBet</p>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">Backoffice</p>
           </div>
         )}

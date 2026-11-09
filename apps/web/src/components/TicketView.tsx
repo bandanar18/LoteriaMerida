@@ -37,6 +37,7 @@ export function TicketView({ ticket, onChange }: { ticket: any; onChange?: (t: a
         )}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
+            <div className="text-sm font-bold text-selva-900">FortunaBet</div>
             <div className="text-xs text-black/50">
               {ticket.game_name}
               {ticket.game_code && <> · {ticket.game_code}</>}

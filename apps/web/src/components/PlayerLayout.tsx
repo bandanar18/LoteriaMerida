@@ -23,10 +23,10 @@ export function PlayerLayout() {
     <div className="flex min-h-dvh flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
       <header className="sticky top-0 z-40 bg-selva-800 text-white shadow">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5 sm:gap-3 sm:py-3">
-          <Link to="/" className="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight">
-            <span className="text-2xl">🦁</span>
-            <span className="hidden min-[400px]:inline">
-              Tepuy<span className="text-oro-400">Apuestas</span>
+          <Link to="/" className="flex shrink-0 items-center gap-1.5 text-base font-extrabold tracking-tight sm:gap-2 sm:text-lg">
+            <span className="text-2xl" aria-hidden="true">🍀</span>
+            <span>
+              Fortuna<span className="text-oro-400">Bet</span>
             </span>
           </Link>
           <nav className="ml-6 hidden gap-1 md:flex">

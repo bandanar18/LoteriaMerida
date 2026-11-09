@@ -1,4 +1,4 @@
-# Tepuy Apuestas — MVP (Fase 0 + 1)
+# FortunaBet — MVP (Fase 0 + 1)
 
 Primer MVP de la plataforma descrita en el *Documento Maestro*: núcleo financiero (ledger de doble partida, auditoría, RNG) y el primer producto, **Animalitos**, con web de jugador y backoffice.
 
