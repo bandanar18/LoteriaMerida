@@ -245,8 +245,7 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-extrabold">{game.name}</h1>
               <p className="text-xs text-white/75">
-                {game.code} · cierre {game.close_minutes_before} min antes ·{' '}
-                {game.result_source === 'INTERNAL_RNG' ? 'RNG verificable' : game.requires_record ? 'resultado con acta' : 'resultado oficial'}
+                {game.code} · cierre {game.close_minutes_before} min antes
               </p>
             </div>
             <div className="shrink-0 rounded-xl bg-white/15 px-3 py-1.5 text-center leading-tight">
@@ -320,10 +319,8 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
                         <div className="text-base font-bold">
                           {hour(d.draw_at)} {d.is_extraordinary && <span title="Sorteo extraordinario">⭐</span>}
                         </div>
-                        {(tomorrow || d.is_automatic) && (
-                          <div className={`text-[11px] font-semibold ${active ? 'text-white/90' : 'text-sky-800'}`}>
-                            {tomorrow ? 'Mañana' : ''}{tomorrow && d.is_automatic ? ' · ' : ''}{d.is_automatic ? 'Automático' : ''}
-                          </div>
+                        {tomorrow && (
+                          <div className={`text-[11px] font-semibold ${active ? 'text-white/90' : 'text-sky-800'}`}>Mañana</div>
                         )}
                         <div className={`text-[11px] tabular-nums ${active ? 'text-white/80' : 'text-black/50'}`}>cierra en {countdown(d.close_at, now)}</div>
                       </>

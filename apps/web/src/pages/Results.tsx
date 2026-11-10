@@ -12,7 +12,8 @@ export function ResultsPage() {
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const game = games.data?.find((g) => g.id === gameId) ?? games.data?.[0];
   const recent = useRecentDraws(game);
-  const tomorrowAutomatic = recent.tomorrowDraws.data?.filter((d) => d.is_automatic) ?? [];
+  // Mañana: solo los sorteos extraordinarios ya programados (los del calendario se ven en Jugar).
+  const tomorrowExtra = recent.tomorrowDraws.data?.filter((d) => d.is_extraordinary) ?? [];
   const [otherDate, setOtherDate] = useState(() => shiftDate(todayCaracas(), -2));
   const other = useDraws(game?.id, otherDate);
 
@@ -39,8 +40,8 @@ export function ResultsPage() {
       <LatestAndNext latest={recent.latest} next={recent.next} now={recent.now} />
 
       <Day title="Hoy" date={recent.today} draws={recent.todayDraws.data} loading={recent.todayDraws.isLoading} latestId={recent.latest?.id} nextId={recent.next?.id} onVerify={setVerifyId} />
-      {tomorrowAutomatic.length > 0 && (
-        <Day title="Automáticos de mañana" date={recent.tomorrow} draws={tomorrowAutomatic} nextId={recent.next?.id} onVerify={setVerifyId} />
+      {tomorrowExtra.length > 0 && (
+        <Day title="Mañana" date={recent.tomorrow} draws={tomorrowExtra} nextId={recent.next?.id} onVerify={setVerifyId} />
       )}
       <Day title="Ayer" date={recent.yesterday} draws={recent.yesterdayDraws.data} loading={recent.yesterdayDraws.isLoading} latestId={recent.latest?.id} onVerify={setVerifyId} />
 
@@ -129,7 +130,6 @@ function Verify({ drawId }: { drawId: string }) {
   const d = v.data.draw;
   return (
     <div className="space-y-3 text-sm">
-      {d.is_automatic && <p className="font-semibold text-sky-800">Sorteo automático</p>}
       <p className="text-black/60">
         Antes de abrir la venta publicamos el <b>hash SHA-256</b> de una semilla secreta. Cuando hay resultado revelamos la semilla para que
         puedas comprobar que no fue cambiada.
@@ -148,7 +148,7 @@ function Verify({ drawId }: { drawId: string }) {
                 label={`El cálculo da ${v.data.computedSymbol?.number} ${v.data.computedSymbol?.name}, igual al resultado publicado`}
               />
             ) : (
-              <p className="text-xs text-black/50">Juego de resultado oficial (carga manual con doble verificación): {d.result_evidence}</p>
+              <p className="text-xs text-black/50">Resultado oficial confirmado con doble verificación.</p>
             )}
           </div>
         </>

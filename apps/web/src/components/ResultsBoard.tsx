@@ -63,7 +63,6 @@ export function LatestAndNext({ latest, next, now }: { latest?: Draw; next?: Dra
               <div className="truncate text-sm font-semibold">{symbolName(r.number, r.name) || (r.emoji ? r.number : '')}</div>
               <div className="text-[11px] text-white/70">
                 {hour(latest.draw_at)}
-                {latest.is_automatic && ' · automático'}
                 {!r.official && ' · preliminar'}
               </div>
             </div>
@@ -79,7 +78,6 @@ export function LatestAndNext({ latest, next, now }: { latest?: Draw; next?: Dra
             <div className="mt-1 text-2xl font-extrabold sm:text-3xl">{hour(next.draw_at)}</div>
             <div className="text-[11px] text-selva-900/70 tabular-nums">
               {todayCaracas(new Date(next.draw_at)) !== todayCaracas() && 'Mañana · '}
-              {next.is_automatic && 'Automático · '}
               {closesIn ? `cierra la venta en ${closesIn}` : `faltan ${countdown(next.draw_at, now) ?? '—'}`}
             </div>
           </>
@@ -108,14 +106,13 @@ export function DayGrid({ draws, latestId, nextId, onVerify }: { draws: Draw[]; 
             className={`relative flex min-h-[7.5rem] flex-col items-center rounded-2xl px-1 pt-2 pb-2 text-center ring-1 transition enabled:active:scale-[0.97] ${
               isLatest ? 'bg-oro-300/40 ring-2 ring-oro-500' : r ? 'bg-white ring-black/10' : 'bg-black/[0.03] ring-black/5'
             }`}
-            aria-label={`${hour(d.draw_at)}${d.is_automatic ? ', sorteo automático' : ''}: ${r ? `${r.number} ${symbolName(r.number, r.name)}` : statusText(d)}`}
+            aria-label={`${hour(d.draw_at)}:${r ? `${r.number} ${symbolName(r.number, r.name)}` : statusText(d)}`}
           >
             <div className="text-xs font-bold text-selva-900 tabular-nums">
               {hour(d.draw_at)}
               {d.is_extraordinary && ' ⭐'}
             </div>
             {isLatest && <span className="absolute -top-2 right-1 rounded-full bg-oro-500 px-1.5 text-[9px] font-extrabold text-selva-950">ÚLTIMO</span>}
-            {d.is_automatic && <span className="mt-0.5 rounded-full bg-sky-100 px-1.5 text-[9px] font-semibold text-sky-800">Automático</span>}
             {r ? (
               <>
                 <div className={`mt-1 text-4xl leading-none ${r.official ? '' : 'opacity-70'}`}><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
@@ -178,7 +175,6 @@ export function RecentStrip({ game }: { game: Game }) {
               <div className="text-2xl leading-tight"><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
               {r.emoji && <div className="text-xs font-extrabold text-selva-900 tabular-nums">{r.number}</div>}
               <div className="text-[9px] text-black/40">{isToday ? 'hoy' : 'ayer'}</div>
-              {d.is_automatic && <div className="text-[9px] font-medium text-sky-800">Automático</div>}
             </div>
           );
         })}
