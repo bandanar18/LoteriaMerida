@@ -7,3 +7,7 @@ coverage/
 
 # Documentos KYC cifrados (nunca al repositorio)
 apps/api/storage/
+
+# Videos de demostración generados (pesados) y temporales de grabación
+videos/
+tools/video/.work/

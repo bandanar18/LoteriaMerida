@@ -18,6 +18,8 @@ export class RegisterDto {
   /** Acepta que es una aplicación DEMO, sin valor real y sin comercialización. */
   @Equals(true, { message: 'Debes aceptar que es una aplicación DEMO sin valor real y que no se permite su comercialización' })
   acceptDemoTerms: boolean;
+  /** Código de agencia (opcional). Un código inválido no impide el registro. */
+  @IsOptional() @IsString() @MaxLength(20) referralCode?: string;
 }
 
 export class LoginDto {

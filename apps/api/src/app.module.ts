@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminController } from './admin/admin.controller';
+import { AffiliateModule } from './affiliate/affiliate.module';
 import { CoreModule } from './common/core.module';
 import { config } from './config';
 import { AuthController } from './identity/auth.controller';
@@ -23,6 +24,7 @@ import { WalletController } from './wallet/wallet.controller';
 @Module({
   imports: [
     CoreModule,
+    AffiliateModule,
     JwtModule.register({ global: true, secret: config.jwtSecret }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),

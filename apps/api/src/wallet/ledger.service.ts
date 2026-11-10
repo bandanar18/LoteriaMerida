@@ -14,8 +14,13 @@ export type AccountType =
   | 'FUTURES_MARGIN'
   | 'HOUSE_FUTURES_FEES'
   | 'HOUSE_FUTURES_PNL'
-  | 'HOUSE_PROMOTIONS';
-export type RefProduct = 'LOTTERY' | 'SPORTS' | 'PAYMENT' | 'ADJUST' | 'FUTURES';
+  | 'HOUSE_PROMOTIONS'
+  | 'AGENT_PENDING'
+  | 'AGENT_CASH'
+  | 'HOUSE_COMMISSIONS'
+  | 'AGENT_LOCKED'
+  | 'HOUSE_FX';
+export type RefProduct = 'LOTTERY' | 'SPORTS' | 'PAYMENT' | 'ADJUST' | 'FUTURES' | 'AFFILIATE';
 
 export interface AccountSpec {
   ownerType: 'PLAYER' | 'HOUSE';
@@ -78,7 +83,7 @@ export class LedgerService {
     return this.account(db, { ownerType: 'PLAYER', ownerId: playerId, accountType, currency });
   }
 
-  house(db: Db, accountType: Exclude<AccountType, 'PLAYER_CASH' | 'PLAYER_LOCKED' | 'PLAYER_FUTURES' | 'FUTURES_MARGIN'>, product: string, currency: CurrencyCode) {
+  house(db: Db, accountType: Exclude<AccountType, 'PLAYER_CASH' | 'PLAYER_LOCKED' | 'PLAYER_FUTURES' | 'FUTURES_MARGIN' | 'AGENT_PENDING' | 'AGENT_CASH' | 'AGENT_LOCKED'>, product: string, currency: CurrencyCode) {
     return this.account(db, { ownerType: 'HOUSE', accountType, product, currency });
   }
 

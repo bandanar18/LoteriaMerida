@@ -55,6 +55,12 @@ export class ExtraordinaryDrawDto {
   @IsOptional() @IsBoolean() auto?: boolean;
 }
 
+export class AutoResultsDto {
+  @IsBoolean() enabled: boolean;
+  /** También los sorteos ya cerrados que siguen esperando resultado. */
+  @IsOptional() @IsBoolean() includeClosed?: boolean;
+}
+
 export class BandTestDto {
   @IsUUID() drawId: string;
   @IsBoolean() simulated: boolean;

@@ -11,11 +11,12 @@ import { DashboardPage } from './pages/admin/Dashboard';
 import { DrawsPage } from './pages/admin/Draws';
 import { KycPage } from './pages/admin/Kyc';
 import { PaymentsPage } from './pages/admin/Payments';
+import { AgenciesPage } from './pages/admin/Agencies';
 import { PlayersPage } from './pages/admin/Players';
 import { RiskPage } from './pages/admin/Risk';
 import { MarketPage } from './pages/admin/Market';
 import { SettingsPage } from './pages/admin/Settings';
-import { LoginPage, RegisterPage } from './pages/Auth';
+import { LoginPage, ReferralLanding, RegisterPage } from './pages/Auth';
 import { PlayPage } from './pages/Play';
 import { ResultsPage } from './pages/Results';
 import { SimulatorPage } from './pages/Simulator';
@@ -50,6 +51,7 @@ export function App() {
         <Route path="futuros" element={<FuturesRoute fallback="/"><FuturesPage /></FuturesRoute>} />
         <Route path="login" element={<LoginPage />} />
         <Route path="registro" element={<RegisterPage />} />
+        <Route path="r/:code" element={<ReferralLanding />} />
         <Route path="tickets" element={<Require kind="PLAYER"><TicketsPage /></Require>} />
         <Route path="simulador" element={<Require kind="PLAYER"><SimulatorPage /></Require>} />
         <Route path="billetera" element={<Require kind="PLAYER"><WalletPage /></Require>} />
@@ -63,6 +65,7 @@ export function App() {
         <Route path="configuracion" element={<SettingsPage />} />
         <Route path="futuros" element={<FuturesRoute fallback="/admin"><FuturesAdminPage /></FuturesRoute>} />
         <Route path="pagos" element={<PaymentsPage />} />
+        <Route path="agencias" element={<AgenciesPage />} />
         <Route path="kyc" element={<KycPage />} />
         <Route path="jugadores" element={<PlayersPage />} />
         <Route path="auditoria" element={<AuditPage />} />

@@ -8,6 +8,7 @@ import { publish } from '../common/realtime';
 import { config } from '../config';
 import { KycStorageService } from '../kyc/kyc-storage.service';
 import { RngService } from '../rng/rng.service';
+import { AffiliateService } from '../affiliate/affiliate.service';
 import { LedgerService } from '../wallet/ledger.service';
 import { DrawIncidentDto, DrawRecordDto } from './lottery.dto';
 
@@ -31,6 +32,7 @@ export class DrawLifecycleService {
     private readonly audit: AuditService,
     private readonly rng: RngService,
     private readonly storage: KycStorageService,
+    private readonly affiliate: AffiliateService,
   ) {}
 
   @Interval(10_000)
@@ -92,7 +94,7 @@ export class DrawLifecycleService {
         [gameId],
       );
       const { rows: candidates } = await db.query(
-        `SELECT g.id AS game_id, times.draw_at, closing.close_at,
+        `SELECT g.id AS game_id, times.draw_at, closing.close_at, g.auto_rng,
                 least(day.d::timestamp AT TIME ZONE g.timezone, closing.close_at - interval '1 minute') AS sales_open_at
            FROM lottery.game g
            JOIN lottery.schedule s ON s.game_id = g.id AND s.active
@@ -110,10 +112,11 @@ export class DrawLifecycleService {
         return { ...draw, seed_hash: seedHash, server_seed: serverSeed };
       });
       const { rowCount } = await db.query(
-        `INSERT INTO lottery.draw (game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed)
-         SELECT game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed
+        `INSERT INTO lottery.draw (game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed, auto_rng)
+         SELECT game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed, auto_rng
            FROM jsonb_to_recordset($1::jsonb) AS d(
-             game_id uuid, draw_at timestamptz, sales_open_at timestamptz, close_at timestamptz, seed_hash text, server_seed text
+             game_id uuid, draw_at timestamptz, sales_open_at timestamptz, close_at timestamptz, seed_hash text, server_seed text,
+             auto_rng boolean
            )
          ON CONFLICT (game_id, draw_at) DO NOTHING`,
         [JSON.stringify(draws)],
@@ -412,6 +415,7 @@ export class DrawLifecycleService {
       }
 
       await this.refreshTickets(c, [...new Set(plays.map((p) => p.ticket_id as string))]);
+      await this.affiliate.releaseForDraw(c, drawId);
       await c.query(`UPDATE lottery.draw SET status = 'SETTLED', settled_at = now() WHERE id = $1`, [drawId]);
       await this.audit.log(c, {
         actorType: 'SYSTEM',
@@ -453,6 +457,7 @@ export class DrawLifecycleService {
           ],
         });
         await c.query(`UPDATE lottery.play SET status = 'VOID', settled_at = now() WHERE id = $1`, [p.id]);
+        await this.affiliate.reverseForPlay(c, p.id);
       }
       await this.refreshTickets(c, [...new Set(plays.map((p) => p.ticket_id as string))]);
       await c.query(`UPDATE lottery.draw SET status = 'CANCELLED', cancelled_reason = $2 WHERE id = $1`, [drawId, reason]);

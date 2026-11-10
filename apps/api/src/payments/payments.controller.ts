@@ -87,11 +87,13 @@ export class PaymentsAdminController {
   withdrawals(@Query() q: StatusQueryDto) {
     return this.db.query(
       `SELECT w.id, w.method, w.currency, w.amount::text, w.destination, w.status, w.reject_reason, w.paid_reference,
-              w.created_at, w.reviewed_at,
+              w.created_at, w.reviewed_at, w.source, w.source_currency, w.source_amount::text, f.rate_e4::text AS fx_rate_e4,
+              (SELECT a.display_name FROM affiliate.agent a WHERE a.user_id = w.player_id) AS agent_name,
               u.email, u.first_name || ' ' || u.last_name AS player_name, u.document_type || '-' || u.document_number AS player_document,
               r.email AS reviewed_by_email
          FROM payments.withdrawal w
          JOIN identity.app_user u ON u.id = w.player_id
+         LEFT JOIN affiliate.fx_rate f ON f.id = w.fx_rate_id
          LEFT JOIN identity.app_user r ON r.id = w.reviewed_by
         WHERE ($1::text IS NULL OR w.status = $1)
         ORDER BY w.created_at DESC LIMIT 200`,
@@ -110,6 +112,6 @@ export class PaymentsAdminController {
   @HttpCode(200)
   @Post('withdrawals/:id/reject')
   rejectWithdrawal(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectDto, @CurrentUser() u: AuthUser, @ClientIp() ip: string) {
-    return this.payments.rejectWithdrawal(id, dto.reason, { id: u.id, ip });
+    return this.payments.rejectWithdrawal(id, dto.reason, { id: u.id, ip }, dto.invalidPayout === true);
   }
 }

@@ -194,8 +194,9 @@ async function main() {
     for (const g of GAMES) {
       const res = await client.query(
         `INSERT INTO lottery.game (code, name, result_source, payout_multiplier, close_minutes_before, license_ref, rules_version,
-                                   is_demo, requires_record, publish_preliminary, prize_expiry_days, display_order, board, draw_count)
-         VALUES ($1, $2, $3, $9, 5, $4, $5, $6, $6, $6, $7, $8, $10, $11)
+                                   is_demo, requires_record, publish_preliminary, prize_expiry_days, display_order, board, draw_count, auto_rng)
+         -- auto_rng solo al crear: en la DEMO los sorteos programados publican su resultado solos; luego lo decide Configuración.
+         VALUES ($1, $2, $3, $9, 5, $4, $5, $6, $6, $6, $7, $8, $10, $11, true)
          ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, license_ref = EXCLUDED.license_ref,
            rules_version = EXCLUDED.rules_version, is_demo = EXCLUDED.is_demo, requires_record = EXCLUDED.requires_record,
            publish_preliminary = EXCLUDED.publish_preliminary, prize_expiry_days = EXCLUDED.prize_expiry_days,

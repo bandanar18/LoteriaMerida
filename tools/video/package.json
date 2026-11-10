@@ -1,0 +1,10 @@
+{
+  "name": "fortunabet-videos",
+  "private": true,
+  "type": "module",
+  "description": "Graba los videos de demostración (DEMO) del administrador y del jugador",
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright-core": "^1.49.1"
+  }
+}

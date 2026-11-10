@@ -16,7 +16,17 @@ interface LimitRow {
   max_player_per_draw: string | null;
 }
 interface GameConfig {
-  game: { id: string; code: string; name: string; timezone: string; close_minutes_before: number; result_source: string; requires_record: boolean };
+  game: {
+    id: string;
+    code: string;
+    name: string;
+    timezone: string;
+    close_minutes_before: number;
+    result_source: string;
+    requires_record: boolean;
+    auto_rng: boolean;
+    awaiting_result: number;
+  };
   limits: LimitRow[];
   schedule: { weekday: number; time: string }[];
 }
@@ -104,6 +114,9 @@ export function SettingsPage() {
                 Al deshabilitarlo se suspenden las ventas y la programación de nuevos sorteos. Los sorteos ya programados se gestionan desde Sorteos.
               </AvailabilityControl>
             )}
+            {cfg.data.game.result_source !== 'INTERNAL_RNG' && (
+              <AutoResults key={`a-${cfg.data.game.id}`} cfg={cfg.data} canEdit={canEdit && game.status === 'ACTIVE'} />
+            )}
             <AutoDraw cfg={cfg.data} canEdit={canEdit && game.status === 'ACTIVE'} canTest={isAdmin && game.is_demo && game.status === 'ACTIVE'} />
             <Limits key={`l-${cfg.data.game.id}`} cfg={cfg.data} canEdit={canEdit} />
           </div>
@@ -159,6 +172,73 @@ function AvailabilityControl({
         </button>
       </div>
       <ErrorBox error={toggle.error} />
+    </Card>
+  );
+}
+
+// ───────────── Resultado automático de los sorteos programados ─────────────
+
+function AutoResults({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const on = cfg.game.auto_rng;
+  const pending = cfg.game.awaiting_result;
+  const [includeClosed, setIncludeClosed] = useState(true);
+  const [done, setDone] = useState<string | null>(null);
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) =>
+      put<{ autoResults: boolean; draws: number }>(`/admin/lottery/games/${cfg.game.id}/auto-results`, { enabled, includeClosed: enabled && includeClosed }),
+    onSuccess: (r) => {
+      setDone(
+        r.autoResults
+          ? `Activado. ${r.draws} sorteo(s) programados se sortearán solos a su hora.`
+          : `Desactivado. Los próximos ${r.draws} sorteo(s) vuelven a la carga manual con acta.`,
+      );
+      qc.invalidateQueries({ queryKey: ['admin'] });
+      qc.invalidateQueries({ queryKey: ['draws'] });
+      qc.invalidateQueries({ queryKey: ['games'] });
+    },
+  });
+  return (
+    <Card
+      title="Resultado automático de los sorteos programados"
+      sub="Los sorteos de cada hora publican su resultado solos: lo pone el generador aleatorio verificable a la hora del sorteo, sin carga manual."
+    >
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={`badge ${on ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'}`}>
+            {on ? 'Automático' : `Manual${cfg.game.requires_record ? ' con acta' : ''} y 4 ojos`}
+          </span>
+          <button
+            type="button"
+            className={on ? 'btn-ghost' : 'btn-primary'}
+            disabled={!canEdit || toggle.isPending}
+            onClick={() => {
+              setDone(null);
+              toggle.mutate(!on);
+            }}
+          >
+            {toggle.isPending ? 'Guardando…' : on ? 'Volver a manual' : 'Activar resultado automático'}
+          </button>
+        </div>
+        {!on && pending > 0 && (
+          <label className="flex items-start gap-2 text-xs text-slate-700">
+            <input type="checkbox" className="mt-0.5" checked={includeClosed} disabled={!canEdit} onChange={(e) => setIncludeClosed(e.target.checked)} />
+            <span>
+              Sortear también los <b>{pending}</b> sorteo(s) ya cerrados que esperan resultado (se liquidan sus tickets en el próximo ciclo).
+            </span>
+          </label>
+        )}
+        {on && pending > 0 && (
+          <Notice tone="warn">
+            Hay {pending} sorteo(s) cerrados de antes que siguen esperando resultado manual. Cárgalos en Sorteos, o vuelve a manual y actívalo marcando la opción para sortearlos.
+          </Notice>
+        )}
+        <ErrorBox error={toggle.error} />
+        {done && <Notice tone="success">{done}</Notice>}
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          Nadie elige el resultado: la semilla de cada sorteo se compromete antes de abrir la venta y los jugadores pueden verificarlo en Resultados.
+        </p>
+      </div>
     </Card>
   );
 }

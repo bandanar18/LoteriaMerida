@@ -95,6 +95,12 @@ node scripts/smoke.mjs --wait
 
 `npm test` corre las reglas de dominio (RTP 30/38 ≈ 78,95 %, chi-cuadrado del RNG, límites, cupos, edad). `smoke.mjs` ejercita el API real (idempotencia concurrente, cupos, anulación, pagos, permisos, ledger y auditoría); con `--wait` además espera un sorteo RNG y uno manual y verifica la liquidación.
 
+```bash
+node scripts/smoke-agencias.mjs
+```
+
+`smoke-agencias.mjs` prueba el Programa de Agencias Virtuales (código de afiliado, referidos, comisión del 3 %, reversos, tasas y suspensión); con `--wait` además espera la liquidación de un sorteo y prueba la liberación y el paso a saldo de juego. Diseño: `WalletLoteria/DOCUMENTO_MAESTRO_WALLET.md`.
+
 ## Convenciones clave
 
 - Dinero siempre en unidades mínimas (`BIGINT` / `bigint`), viaja como string en JSON. Nunca `float`.

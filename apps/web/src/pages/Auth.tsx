@@ -1,5 +1,7 @@
-import { FormEvent, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { get } from '../lib/api';
+import { clearReferral, readReferral, storeReferral } from '../lib/referral';
 import { ErrorBox } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { DemoNotice } from '../components/Demo';
@@ -87,9 +89,38 @@ const STATES = [
   'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Yaracuy', 'Zulia',
 ];
 
+/** /r/:code — destino del QR de la Wallet de Agencias: guarda el código y lleva al registro. */
+export function ReferralLanding() {
+  const { code = '' } = useParams();
+  const { user } = useAuth();
+  storeReferral(code);
+  return <Navigate to={user ? '/' : '/registro'} replace />;
+}
+
+type ReferralCheck = { state: 'idle' | 'checking' } | { state: 'valid'; agentName: string } | { state: 'invalid' };
+
+/** Valida el código de agencia mientras se escribe (con espera breve para no consultar en cada tecla). */
+function useReferralCheck(code: string): ReferralCheck {
+  const [check, setCheck] = useState<ReferralCheck>({ state: 'idle' });
+  useEffect(() => {
+    const c = code.trim();
+    if (!c) return setCheck({ state: 'idle' });
+    setCheck({ state: 'checking' });
+    const t = setTimeout(() => {
+      get<{ valid: boolean; agentName?: string }>(`/affiliate/codes/${encodeURIComponent(c)}`)
+        .then((r) => setCheck(r.valid ? { state: 'valid', agentName: r.agentName ?? '' } : { state: 'invalid' }))
+        .catch(() => setCheck({ state: 'idle' }));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [code]);
+  return check;
+}
+
 export function RegisterPage() {
   const { register } = useAuth();
   const nav = useNavigate();
+  const [referralCode, setReferralCode] = useState(() => readReferral());
+  const referral = useReferralCheck(referralCode);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -115,8 +146,10 @@ export function RegisterPage() {
     setError(null);
     try {
       const { city, ...rest } = form;
-      const body = { ...(city ? form : rest), acceptDemoTerms: true };
+      const code = referralCode.trim();
+      const body = { ...(city ? form : rest), acceptDemoTerms: true, ...(code ? { referralCode: code } : {}) };
       await register(body);
+      clearReferral();
       nav('/billetera', { replace: true, state: { welcome: true } });
     } catch (err) {
       setError(err);
@@ -194,6 +227,19 @@ export function RegisterPage() {
               <option value="USDT">USDT</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label className="label">Código de agencia (opcional)</label>
+          <input
+            className="input uppercase"
+            placeholder="FB-XXXXXX"
+            autoComplete="off"
+            maxLength={20}
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value)}
+          />
+          {referral.state === 'valid' && <p className="mt-1 text-sm font-semibold text-selva-700">Te invitó: {referral.agentName}</p>}
+          {referral.state === 'invalid' && <p className="mt-1 text-sm text-black/50">Código no válido, puedes continuar sin él.</p>}
         </div>
         <label className="flex items-start gap-2 text-sm text-black/70">
           <input type="checkbox" className="mt-1" checked={accept} onChange={(e) => setAccept(e.target.checked)} />

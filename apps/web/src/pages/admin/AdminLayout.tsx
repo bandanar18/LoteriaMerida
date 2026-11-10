@@ -130,7 +130,10 @@ const NAV: { title: string; items: NavItem[] }[] = [
   },
   {
     title: 'Finanzas',
-    items: [{ to: '/admin/pagos', label: 'Pagos', icon: 'payments', roles: ['CASHIER', 'AUDITOR'] }],
+    items: [
+      { to: '/admin/pagos', label: 'Pagos', icon: 'payments', roles: ['CASHIER', 'AUDITOR'] },
+      { to: '/admin/agencias', label: 'Agencias', icon: 'players', roles: ['AUDITOR', 'COMPLIANCE'] },
+    ],
   },
   {
     title: 'Cumplimiento',

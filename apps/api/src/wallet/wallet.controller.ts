@@ -31,7 +31,7 @@ export class WalletController {
          FROM wallet.ledger_entry e
          JOIN wallet.account a ON a.id = e.account_id
          JOIN wallet.ledger_transaction t ON t.id = e.transaction_id
-        WHERE a.owner_type = 'PLAYER' AND a.owner_id = $1
+        WHERE a.owner_type = 'PLAYER' AND a.owner_id = $1 AND a.account_type NOT LIKE 'AGENT\_%'
         ORDER BY e.id DESC LIMIT $2`,
       [user.id, n],
     );

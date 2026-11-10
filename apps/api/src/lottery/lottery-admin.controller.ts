@@ -10,6 +10,7 @@ import { AuthUser, ClientIp, CurrentUser, Roles } from '../identity/auth.guard';
 import { DrawLifecycleService } from './draw-lifecycle.service';
 import {
   AnalyticsQueryDto,
+  AutoResultsDto,
   BandTestDto,
   CancelDrawDto,
   DrawIncidentDto,
@@ -59,6 +60,12 @@ export class LotteryAdminController {
   @Get('games/:id/config')
   config(@Param('id', ParseUUIDPipe) gameId: string) {
     return this.gameConfig.get(gameId);
+  }
+
+  @Roles('LOTTERY_OPERATOR')
+  @Put('games/:id/auto-results')
+  setAutoResults(@Param('id', ParseUUIDPipe) gameId: string, @Body() dto: AutoResultsDto, @CurrentUser() u: AuthUser, @ClientIp() ip: string) {
+    return this.gameConfig.setAutoResults(gameId, dto.enabled, dto.includeClosed ?? false, { id: u.id, ip });
   }
 
   @Roles('LOTTERY_OPERATOR')

@@ -30,6 +30,13 @@ export const config = {
     VES: parseAmount(process.env.SIGNUP_BONUS_VES ?? '10000', 'VES'),
     USDT: parseAmount(process.env.SIGNUP_BONUS_USDT ?? '10', 'USDT'),
   },
+  /**
+   * SMS de confirmación (Directorio de Pago Móvil). Con false (DEMO) el código NO se envía: se devuelve
+   * al cliente para mostrarlo en pantalla. En producción con dinero real debe estar en true (ver main.ts).
+   */
+  smsEnabled: (process.env.SMS_ENABLED ?? 'false') === 'true',
+  /** Retiro mínimo de agencia por Pago Móvil, en Bs (unidades mínimas). */
+  agentMinWithdrawalVes: parseAmount(process.env.AGENT_MIN_WITHDRAWAL_VES ?? '100', 'VES'),
   kyc: {
     storageDir: resolve(__dirname, '..', process.env.KYC_STORAGE_DIR ?? 'storage/kyc'),
     /** 32 bytes en hex (64 caracteres) para AES-256-GCM. */

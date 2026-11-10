@@ -5,3 +5,4 @@ export * from './identity';
 export * from './kyc';
 export * from './sports';
 export * from './futures';
+export * from './affiliate';

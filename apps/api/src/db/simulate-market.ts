@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomInt, randomUUID } from 'crypto';
 import { parseAmount } from '@loteria/domain';
+import { AffiliateService } from '../affiliate/affiliate.service';
 import { AuditService } from '../audit/audit.service';
 import { DbService } from '../common/db.service';
 import { config } from '../config';
@@ -38,8 +39,9 @@ async function main() {
   const ledger = new LedgerService();
   const audit = new AuditService();
   const rng = new RngService();
-  const lottery = new LotteryService(db, ledger, audit);
-  const lifecycle = new DrawLifecycleService(db, ledger, audit, rng, new KycStorageService());
+  const affiliate = new AffiliateService(ledger, audit);
+  const lottery = new LotteryService(db, ledger, audit, affiliate);
+  const lifecycle = new DrawLifecycleService(db, ledger, audit, rng, new KycStorageService(), affiliate);
 
   try {
     const game = await db.one(`SELECT id, code, timezone, close_minutes_before FROM lottery.game WHERE code = $1`, [code]);

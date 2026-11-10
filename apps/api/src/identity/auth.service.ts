@@ -9,6 +9,7 @@ import { DbService } from '../common/db.service';
 import { BusinessError, pgErrorCode } from '../common/errors';
 import { localDate } from '../common/time';
 import { config } from '../config';
+import { AffiliateService } from '../affiliate/affiliate.service';
 import { LedgerService } from '../wallet/ledger.service';
 import { RegisterDto } from './auth.dto';
 
@@ -26,6 +27,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly affiliate: AffiliateService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta) {
@@ -67,6 +69,14 @@ export class AuthService {
         await this.ledger.playerCash(c, u.id, 'USDT');
         // Bono de bienvenida DEMO (10.000 Bs y 10 USDT), en la misma transacción del registro.
         u.signup_bonus = await grantSignupBonus(c, this.ledger, this.audit, u.id);
+        // Agencias Virtuales: vínculo permanente con la agencia del código (si es válido).
+        u.referral = await this.affiliate.attachReferral(
+          c,
+          u.id,
+          dto.referralCode,
+          { documentType: dto.documentType, documentNumber: docNumber, phone },
+          meta.ip,
+        );
         await this.audit.log(c, {
           actorType: 'PLAYER',
           actorId: u.id,
@@ -78,7 +88,7 @@ export class AuthService {
         });
         return u;
       });
-      return { ...(await this.issueTokens(user, meta)), signupBonus: user.signup_bonus };
+      return { ...(await this.issueTokens(user, meta)), signupBonus: user.signup_bonus, referral: user.referral };
     } catch (err) {
       if (pgErrorCode(err) === '23505') {
         throw new BusinessError('CONFLICT', 'Ya existe una cuenta con ese correo, teléfono o documento');

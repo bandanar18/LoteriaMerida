@@ -187,7 +187,7 @@ export class PaymentsService {
   myWithdrawals(playerId: string) {
     return this.db.query(
       `SELECT id, method, currency, amount::text, destination, status, reject_reason, paid_reference, created_at, reviewed_at
-         FROM payments.withdrawal WHERE player_id = $1 ORDER BY created_at DESC LIMIT 50`,
+         FROM payments.withdrawal WHERE player_id = $1 AND source = 'PLAYER' ORDER BY created_at DESC LIMIT 50`,
       [playerId],
     );
   }
@@ -196,18 +196,20 @@ export class PaymentsService {
     return this.finishWithdrawal(id, actor, { paid: true, paidReference });
   }
 
-  async rejectWithdrawal(id: string, reason: string, actor: Actor) {
-    return this.finishWithdrawal(id, actor, { paid: false, reason });
+  async rejectWithdrawal(id: string, reason: string, actor: Actor, invalidPayout = false) {
+    return this.finishWithdrawal(id, actor, { paid: false, reason, invalidPayout });
   }
 
-  private async finishWithdrawal(id: string, actor: Actor, outcome: { paid: true; paidReference: string } | { paid: false; reason: string }) {
+  private async finishWithdrawal(id: string, actor: Actor, outcome: { paid: true; paidReference: string } | { paid: false; reason: string; invalidPayout?: boolean }) {
     return this.db.tx(async (c) => {
       const w = (await c.query(`SELECT * FROM payments.withdrawal WHERE id = $1 FOR UPDATE`, [id])).rows[0];
       if (!w) throw new BusinessError('NOT_FOUND', 'Retiro no encontrado');
       if (w.status !== 'REQUESTED') throw new BusinessError('INVALID_STATE', `El retiro ya está ${w.status}`);
       const amount = BigInt(w.amount);
-      const locked = await this.ledger.playerLocked(c, w.player_id, w.currency);
-      const tx = await this.ledger.post(c, {
+      const tx =
+        w.source === 'AGENT'
+          ? await this.finishAgentWithdrawal(c, w, amount, outcome.paid, actor)
+          : await this.ledger.post(c, {
         type: outcome.paid ? 'WITHDRAWAL_PAID' : 'WITHDRAWAL_REJECTED',
         refProduct: 'PAYMENT',
         refId: w.id,
@@ -215,14 +217,21 @@ export class PaymentsService {
         createdBy: actor.id,
         entries: outcome.paid
           ? [
-              { accountId: locked, direction: 'D', amount },
+              { accountId: await this.ledger.playerLocked(c, w.player_id, w.currency), direction: 'D', amount },
               { accountId: await this.ledger.house(c, 'PAYMENT_CLEARING', w.method, w.currency), direction: 'C', amount },
             ]
           : [
-              { accountId: locked, direction: 'D', amount },
+              { accountId: await this.ledger.playerLocked(c, w.player_id, w.currency), direction: 'D', amount },
               { accountId: await this.ledger.playerCash(c, w.player_id, w.currency), direction: 'C', amount },
             ],
       });
+      // P8: caja marca el Pago Móvil de la agencia con datos incorrectos.
+      if (!outcome.paid && outcome.invalidPayout && w.payout_account_id) {
+        await c.query(`UPDATE affiliate.payout_account SET status = 'INVALID', invalid_reason = $2, updated_at = now() WHERE id = $1`, [
+          w.payout_account_id,
+          outcome.reason,
+        ]);
+      }
       await c.query(
         `UPDATE payments.withdrawal SET status = $2, reviewed_by = $3, reviewed_at = now(), final_ledger_tx_id = $4,
                 paid_reference = $5, reject_reason = $6 WHERE id = $1`,
@@ -246,6 +255,63 @@ export class PaymentsService {
       });
       await this.notify(c, w.player_id, 'withdrawal', w.id, outcome.paid ? 'PAID' : 'REJECTED');
       return { status: outcome.paid ? 'PAID' : 'REJECTED' };
+    });
+  }
+
+/**
+   * Retiro de agencia (siempre Bs por Pago Móvil). Pagado: AGENT_LOCKED → PAYMENT_CLEARING.
+   * Rechazado desde Bs: vuelve a AGENT_CASH. Rechazado desde USDT: se deshace la conversión y vuelven los USDT exactos (W3).
+   */
+  private async finishAgentWithdrawal(c: Db, w: any, amountVes: bigint, paid: boolean, actor: Actor) {
+    const locked = await this.ledger.playerAccount(c, w.player_id, 'AGENT_LOCKED', 'VES');
+    if (paid) {
+      return this.ledger.post(c, {
+        type: 'AGENT_WITHDRAWAL_PAID',
+        refProduct: 'AFFILIATE',
+        refId: w.id,
+        idempotencyKey: `payment:withdrawal-final:${w.id}`,
+        createdBy: actor.id,
+        entries: [
+          { accountId: locked, direction: 'D', amount: amountVes },
+          { accountId: await this.ledger.house(c, 'PAYMENT_CLEARING', w.method, 'VES'), direction: 'C', amount: amountVes },
+        ],
+      });
+    }
+    if (w.source_currency === 'VES') {
+      return this.ledger.post(c, {
+        type: 'AGENT_WITHDRAWAL_REJECTED',
+        refProduct: 'AFFILIATE',
+        refId: w.id,
+        idempotencyKey: `payment:withdrawal-final:${w.id}`,
+        createdBy: actor.id,
+        entries: [
+          { accountId: locked, direction: 'D', amount: amountVes },
+          { accountId: await this.ledger.playerAccount(c, w.player_id, 'AGENT_CASH', 'VES'), direction: 'C', amount: amountVes },
+        ],
+      });
+    }
+    const usdt = BigInt(w.source_amount);
+    await this.ledger.post(c, {
+      type: 'AGENT_FX_REVERSED',
+      refProduct: 'AFFILIATE',
+      refId: w.id,
+      idempotencyKey: `payment:withdrawal-fx-rev-ves:${w.id}`,
+      createdBy: actor.id,
+      entries: [
+        { accountId: locked, direction: 'D', amount: amountVes },
+        { accountId: await this.ledger.house(c, 'HOUSE_FX', '', 'VES'), direction: 'C', amount: amountVes },
+      ],
+    });
+    return this.ledger.post(c, {
+      type: 'AGENT_FX_REVERSED',
+      refProduct: 'AFFILIATE',
+      refId: w.id,
+      idempotencyKey: `payment:withdrawal-final:${w.id}`,
+      createdBy: actor.id,
+      entries: [
+        { accountId: await this.ledger.house(c, 'HOUSE_FX', '', 'USDT'), direction: 'D', amount: usdt },
+        { accountId: await this.ledger.playerAccount(c, w.player_id, 'AGENT_CASH', 'USDT'), direction: 'C', amount: usdt },
+      ],
     });
   }
 

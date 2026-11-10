@@ -19,9 +19,12 @@ export function PaymentsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
 
-  function reject(path: string) {
+  function reject(path: string, agent = false) {
     const reason = prompt('Motivo del rechazo');
-    if (reason && reason.length >= 3) act.mutate({ path, body: { reason } });
+    if (!reason || reason.length < 3) return;
+    // Retiros de agencia: el Pago Móvil puede quedar marcado con datos incorrectos (la agencia debe corregirlo).
+    const invalidPayout = agent && confirm('¿Los datos del Pago Móvil son incorrectos?\n\nAceptar: se inhabilita ese Pago Móvil hasta que la agencia lo corrija.');
+    act.mutate({ path, body: { reason, ...(invalidPayout ? { invalidPayout: true } : {}) } });
   }
 
   return (
@@ -74,6 +77,9 @@ export function PaymentsPage() {
                 <tr key={r.id}>
                   <td className="whitespace-nowrap text-black/60">{dateTime(r.created_at)}</td>
                   <td>
+                    {r.source === 'AGENT' && (
+                      <span className="mb-0.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Agencia · {r.agent_name}</span>
+                    )}
                     <div className="font-medium">{r.player_name}</div>
                     <div className="text-xs text-black/50">
                       {r.player_document} · {r.email}
@@ -88,6 +94,18 @@ export function PaymentsPage() {
                         {r.reference}
                         {r.payer_phone && <div className="text-black/50">tel. {r.payer_phone}</div>}
                       </>
+                    ) : r.source === 'AGENT' ? (
+                      <>
+                        <div>Pagar a: {r.destination.bank}</div>
+                        <div>
+                          Tel. 0{String(r.destination.phone).slice(2)} · {r.destination.document}
+                        </div>
+                        <div className="font-sans text-black/60">
+                          {r.destination.holderName}
+                          {r.destination.holderKind === 'FAMILY' && ` (familiar: ${String(r.destination.relationship).toLowerCase().replace('_', ' / ')})`}
+                        </div>
+                        {r.paid_reference && <div className="text-black/50">pagado ref. {r.paid_reference}</div>}
+                      </>
                     ) : (
                       <>
                         {r.destination.bank}
@@ -97,7 +115,14 @@ export function PaymentsPage() {
                       </>
                     )}
                   </td>
-                  <td className="text-right font-semibold tabular-nums">{money(r.amount, r.currency as Currency)}</td>
+                  <td className="text-right font-semibold tabular-nums">
+                    {money(r.amount, r.currency as Currency)}
+                    {r.source === 'AGENT' && r.source_currency === 'USDT' && (
+                      <div className="text-[11px] font-normal text-black/50">
+                        desde {money(r.source_amount, 'USDT')} · tasa {(Number(r.fx_rate_e4) / 10000).toFixed(4).replace('.', ',')}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <StatusBadge status={r.status} />
                     {r.reviewed_by_email && <div className="mt-1 text-[11px] text-black/40">{r.reviewed_by_email}</div>}
@@ -126,7 +151,7 @@ export function PaymentsPage() {
                         >
                           Marcar pagado
                         </button>
-                        <button className="btn-ghost px-3 py-1.5" disabled={act.isPending} onClick={() => reject(`withdrawals/${r.id}/reject`)}>
+                        <button className="btn-ghost px-3 py-1.5" disabled={act.isPending} onClick={() => reject(`withdrawals/${r.id}/reject`, r.source === 'AGENT')}>
                           Rechazar
                         </button>
                       </div>

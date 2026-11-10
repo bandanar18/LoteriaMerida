@@ -28,6 +28,7 @@ import { BusinessError, pgErrorCode } from '../common/errors';
 import { publish } from '../common/realtime';
 import { localDate } from '../common/time';
 import { assertPlayerCanPlay } from '../identity/player-status';
+import { AffiliateService } from '../affiliate/affiliate.service';
 import { LedgerService } from '../wallet/ledger.service';
 import { BuyTicketDto } from './lottery.dto';
 
@@ -76,6 +77,7 @@ export class LotteryService {
     private readonly db: DbService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly affiliate: AffiliateService,
   ) {}
 
   // ───────────── Lectura pública ─────────────
@@ -585,6 +587,8 @@ export class LotteryService {
         },
       ],
     });
+    // Agencias Virtuales: comisión «por liberar» en la misma transacción de la venta.
+    await this.affiliate.accrueForTicket(c, { ticketId, playerId, gameId: dto.gameId, currency, isSimulation });
 
     await this.audit.log(c, {
       actorType: 'PLAYER',
@@ -660,6 +664,7 @@ export class LotteryService {
           },
         ],
       });
+      await this.affiliate.reverseForTicket(c, ticketId);
       await this.audit.log(c, {
         actorType: 'PLAYER',
         actorId: playerId,

@@ -48,9 +48,40 @@ export class GameConfigService {
     });
   }
 
+  /**
+   * Resultado automático de los sorteos programados: con el interruptor encendido, cada sorteo del calendario
+   * se sortea solo con el RNG provably fair a su hora (semilla comprometida antes de la venta); apagado, vuelve
+   * a la carga manual con acta y 4 ojos. Aplica a los sorteos del calendario que aún no cerraron y, si se pide,
+   * a los ya cerrados que siguen esperando resultado (su semilla también se comprometió antes de la venta).
+   */
+  async setAutoResults(gameId: string, enabled: boolean, includeClosed: boolean, actor: Actor) {
+    return this.db.tx(async (c) => {
+      const { rows: [game] } = await c.query('SELECT auto_rng FROM lottery.game WHERE id = $1 FOR UPDATE', [gameId]);
+      if (!game) throw new BusinessError('NOT_FOUND', 'Juego no encontrado');
+      await c.query('UPDATE lottery.game SET auto_rng = $2 WHERE id = $1', [gameId, enabled]);
+      const statuses = enabled && includeClosed ? ['SCHEDULED', 'OPEN', 'CLOSED'] : ['SCHEDULED', 'OPEN'];
+      const { rowCount: upcoming } = await c.query(
+        `UPDATE lottery.draw SET auto_rng = $2
+          WHERE game_id = $1 AND NOT is_extraordinary AND sim_player_id IS NULL AND auto_rng <> $2 AND status = ANY($3::text[])`,
+        [gameId, enabled, statuses],
+      );
+      await this.audit.log(c, {
+        actorType: 'STAFF', actorId: actor.id, action: 'GAME_AUTO_RESULTS_UPDATED', entity: 'lottery.game', entityId: gameId,
+        before: { auto_rng: game.auto_rng }, after: { auto_rng: enabled, includeClosed: enabled && includeClosed, draws: upcoming ?? 0 },
+        ip: actor.ip,
+      });
+      await publish(c, 'lobby', 'game-availability', { gameId });
+      return { autoResults: enabled, draws: upcoming ?? 0 };
+    });
+  }
+
   async get(gameId: string) {
     const game = await this.db.one(
-      `SELECT id, code, name, timezone, close_minutes_before, result_source, requires_record FROM lottery.game WHERE id = $1`,
+      `SELECT g.id, g.code, g.name, g.timezone, g.close_minutes_before, g.result_source, g.requires_record, g.auto_rng,
+              (SELECT count(*)::int FROM lottery.draw d
+                WHERE d.game_id = g.id AND d.status = 'CLOSED' AND NOT d.auto_rng AND d.sim_player_id IS NULL
+                  AND d.draw_at <= now()) AS awaiting_result
+         FROM lottery.game g WHERE g.id = $1`,
       [gameId],
     );
     if (!game) throw new BusinessError('NOT_FOUND', 'Juego no encontrado');

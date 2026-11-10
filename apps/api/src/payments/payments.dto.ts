@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
 
 export class CreateDepositDto {
   @IsIn(['PAGO_MOVIL', 'TRANSFER', 'USDT']) method: 'PAGO_MOVIL' | 'TRANSFER' | 'USDT';
@@ -22,6 +22,8 @@ export class CreateWithdrawalDto {
 
 export class RejectDto {
   @IsString() @Length(3, 300) reason: string;
+  /** Retiros de agencia: el Pago Móvil tiene datos incorrectos (queda inhabilitado hasta corregirlo). */
+  @IsOptional() @IsBoolean() invalidPayout?: boolean;
 }
 
 export class PayWithdrawalDto {
