@@ -77,6 +77,9 @@ if (!args.has('--sin-seed')) run('Cargando datos iniciales (juegos, usuarios de 
 // La base de datos no viaja en el repositorio: cada instalación genera su propio historial de muestra
 // (hoy y los 2 días anteriores, de 8 a. m. a 8 p. m. cada hora) con el RNG provably fair. Solo llena lo que falta.
 if (!args.has('--sin-seed') && !args.has('--sin-historial')) {
+  // Primero los resultados guardados en el repositorio (los mismos en todos los equipos); luego se rellena lo que falte.
+  const imp = spawnSync('npm', ['run', 'historial:importar', '-w', '@loteria/api', '--silent'], { cwd: root, stdio: 'inherit', shell: isWin });
+  if (imp.status !== 0) say('No se pudo cargar el historial del repositorio; el sistema arranca igual.', 'warn');
   say('Generando resultados de muestra (últimos 3 días, 8 a. m. – 8 p. m.; solo lo que falta)…');
   const r = spawnSync('npm', ['run', 'simulate:history', '-w', '@loteria/api', '--silent', '--', '2', '--desde', '8', '--hasta', '20'], {
     cwd: root, stdio: 'inherit', shell: isWin,

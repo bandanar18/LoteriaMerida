@@ -10,7 +10,9 @@
     "seed": "tsx src/db/seed.ts",
     "simulate:history": "tsx src/db/simulate-history.ts",
     "simulate:market": "tsx src/db/simulate-market.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "historial:exportar": "tsx src/db/history-export.ts",
+    "historial:importar": "tsx src/db/history-import.ts"
   },
   "dependencies": {
     "@loteria/domain": "0.1.0",
