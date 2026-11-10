@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorBox, Notice, PageTitle, Spinner } from '../../components/ui';
 import { get, post, put } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { Currency, CURRENCY, dateTime, hour, money } from '../../lib/format';
-import { useGames, useSimulationStatus } from '../../lib/queries';
+import { useAdminGames, usePlatform, useSimulationStatus } from '../../lib/queries';
 
 interface LimitRow {
   currency: Currency;
@@ -43,9 +43,11 @@ const time12 = (t: string) => {
  * Leer: operador y auditor. Cambiar: operador de sorteos (y administrador). Todo queda en auditoría.
  */
 export function SettingsPage() {
-  const games = useGames();
+  const games = useAdminGames();
+  const platform = usePlatform();
   const { user } = useAuth();
-  const canEdit = user?.role === 'ADMIN' || user?.role === 'LOTTERY_OPERATOR';
+  const isAdmin = user?.role === 'ADMIN';
+  const canEdit = isAdmin || user?.role === 'LOTTERY_OPERATOR';
   const [gameId, setGameId] = useState<string>();
   const game = games.data?.find((g) => g.id === gameId) ?? games.data?.find((g) => g.code === 'MER-05') ?? games.data?.[0];
   const cfg = useQuery({
@@ -58,6 +60,18 @@ export function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageTitle>Configuración de juegos</PageTitle>
+      {isAdmin && platform.data && (
+        <AvailabilityControl
+          title="Futuros"
+          enabled={platform.data.futuresEnabled}
+          path="/admin/futures/availability"
+          refreshKeys={[[ 'platform' ], [ 'futures' ], [ 'admin', 'futures' ]]}
+          visibility
+        >
+          Muestra u oculta el módulo completo del demo. Al ocultarlo se detienen las operaciones y se guardan las posiciones, las órdenes y el historial.
+        </AvailabilityControl>
+      )}
+      {isAdmin && <ErrorBox error={platform.error} />}
       <div className={`no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0 ${(games.data?.length ?? 0) < 2 ? 'hidden' : ''}`}>
         {games.data?.map((g) => (
           <button
@@ -65,19 +79,32 @@ export function SettingsPage() {
             onClick={() => setGameId(g.id)}
             className={`btn shrink-0 ${g.id === game?.id ? 'bg-selva-800 text-white' : 'bg-white text-slate-700 ring-1 ring-black/10'}`}
           >
-            {g.name}
+            {g.name}{g.status === 'INACTIVE' ? ' · Deshabilitado' : ''}
           </button>
         ))}
       </div>
       {!canEdit && <Notice>Puedes ver la configuración; solo el operador de sorteos o el administrador pueden cambiarla.</Notice>}
-      {cfg.error ? (
-        <ErrorBox error={cfg.error} />
+      {games.error || cfg.error ? (
+        <ErrorBox error={games.error ?? cfg.error} />
+      ) : !game ? (
+        <Notice>No hay juegos configurados.</Notice>
       ) : !cfg.data ? (
         <Spinner />
       ) : (
         <div className="grid gap-5 xl:grid-cols-2">
           <div className="space-y-5">
-            <AutoDraw cfg={cfg.data} canEdit={canEdit} canTest={user?.role === 'ADMIN' && game?.is_demo === true} />
+            {isAdmin && (
+              <AvailabilityControl
+                key={game.id}
+                title={game.name}
+                enabled={game.status === 'ACTIVE'}
+                path={`/admin/lottery/games/${game.id}/availability`}
+                refreshKeys={[[ 'admin', 'games' ], [ 'games' ], [ 'draws', game.id ], [ 'admin', 'draws', game.id ], [ 'admin', 'dashboard' ]]}
+              >
+                Al deshabilitarlo se suspenden las ventas y la programación de nuevos sorteos. Los sorteos ya programados se gestionan desde Sorteos.
+              </AvailabilityControl>
+            )}
+            <AutoDraw cfg={cfg.data} canEdit={canEdit && game.status === 'ACTIVE'} canTest={isAdmin && game.is_demo && game.status === 'ACTIVE'} />
             <Limits key={`l-${cfg.data.game.id}`} cfg={cfg.data} canEdit={canEdit} />
           </div>
           <Schedule key={`s-${cfg.data.game.id}`} cfg={cfg.data} canEdit={canEdit} />
@@ -101,6 +128,38 @@ function Card({ title, sub, children }: { title: string; sub: string; children: 
       </div>
       <div className="p-5">{children}</div>
     </section>
+  );
+}
+
+function AvailabilityControl({
+  title, enabled, path, refreshKeys, children, visibility = false,
+}: {
+  title: string;
+  enabled: boolean;
+  path: string;
+  refreshKeys: QueryKey[];
+  children: string;
+  visibility?: boolean;
+}) {
+  const qc = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: (next: boolean) => put(path, { enabled: next }),
+    onSuccess: () => Promise.all(refreshKeys.map((queryKey) => qc.invalidateQueries({ queryKey }))),
+  });
+  const status = visibility ? (enabled ? 'Visible' : 'Oculto') : (enabled ? 'Habilitado' : 'Deshabilitado');
+  const action = visibility ? (enabled ? 'Ocultar Futuros' : 'Mostrar Futuros') : (enabled ? 'Deshabilitar' : 'Habilitar');
+  return (
+    <Card title={`Disponibilidad · ${title}`} sub={children}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={`badge ${enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+          {status}
+        </span>
+        <button type="button" className={enabled ? 'btn-ghost' : 'btn-primary'} disabled={toggle.isPending} onClick={() => toggle.mutate(!enabled)}>
+          {toggle.isPending ? 'Guardando…' : action}
+        </button>
+      </div>
+      <ErrorBox error={toggle.error} />
+    </Card>
   );
 }
 
@@ -277,6 +336,80 @@ function Limits({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
 
 // ───────────── Horarios ─────────────
 
+function WeeklySchedule({
+  disabled,
+  onApply,
+}: {
+  disabled: boolean;
+  onApply: (times: string[], days: number[], replace: boolean) => void;
+}) {
+  const [from, setFrom] = useState('09:00');
+  const [to, setTo] = useState('20:00');
+  const [interval, setIntervalMinutes] = useState(60);
+  const [days, setDays] = useState(DAY_ORDER);
+  const [replace, setReplace] = useState(false);
+
+  const minutes = (time: string) => {
+    const [hours, mins] = time.split(':').map(Number);
+    return hours * 60 + mins;
+  };
+  const times: string[] = [];
+  for (let minute = minutes(from); minute <= minutes(to); minute += interval) {
+    const hours = String(Math.floor(minute / 60)).padStart(2, '0');
+    const mins = String(minute % 60).padStart(2, '0');
+    times.push(`${hours}:${mins}`);
+  }
+
+  return (
+    <fieldset className="mb-4 space-y-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200" disabled={disabled}>
+      <h3 className="text-sm font-semibold text-slate-900">Repetición semanal</h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <label className="space-y-1 text-xs font-medium text-slate-600">
+          <span>Desde</span>
+          <input type="time" className="input w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="space-y-1 text-xs font-medium text-slate-600">
+          <span>Hasta</span>
+          <input type="time" className="input w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <label className="col-span-2 space-y-1 text-xs font-medium text-slate-600 sm:col-span-1">
+          <span>Frecuencia</span>
+          <select className="input w-full" value={interval} onChange={(e) => setIntervalMinutes(Number(e.target.value))}>
+            <option value={5}>Cada 5 minutos</option>
+            <option value={60}>Cada hora</option>
+            <option value={120}>Cada 2 horas</option>
+          </select>
+        </label>
+      </div>
+      <fieldset className="flex flex-wrap gap-x-3 gap-y-2 text-xs text-slate-700">
+        <legend className="mb-2 font-medium text-slate-600">Días de la semana</legend>
+        {DAY_ORDER.map((day) => (
+          <label key={day} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={days.includes(day)}
+              onChange={(e) => setDays(e.target.checked ? [...days, day] : days.filter((d) => d !== day))}
+            />
+            {DAYS[day]}
+          </label>
+        ))}
+      </fieldset>
+      <label className="flex items-center gap-2 text-xs text-slate-700">
+        <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
+        Reemplazar todos los horarios de los días elegidos
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-ghost" disabled={!times.length || !days.length} onClick={() => onApply(times, days, replace)}>
+          Aplicar repetición
+        </button>
+        <span className="text-xs text-slate-500">
+          {times.length ? `${times.length * days.length} horarios en la repetición` : 'Elige un rango dentro del mismo día'}
+        </span>
+      </div>
+    </fieldset>
+  );
+}
+
 function Schedule({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
   const qc = useQueryClient();
   const initial = useMemo(() => {
@@ -322,6 +455,23 @@ function Schedule({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
     setNewTime('');
   };
 
+  const applyWeekly = (times: string[], days: number[], replace: boolean) => {
+    setRows((current) => {
+      const next = new Map(current);
+      if (replace) {
+        for (const [time, scheduled] of current) {
+          const remaining = [...scheduled].filter((day) => !days.includes(day));
+          if (remaining.length) next.set(time, new Set(remaining));
+          else next.delete(time);
+        }
+      }
+      for (const time of times) {
+        next.set(time, new Set([...(next.get(time) ?? []), ...days]));
+      }
+      return next;
+    });
+  };
+
   const save = useMutation({
     mutationFn: () =>
       put<{ removed: number; keptWithPlays: string[] }>(`/admin/lottery/games/${cfg.game.id}/schedule`, {
@@ -338,7 +488,7 @@ function Schedule({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
   });
 
   return (
-    <Card title="Horarios de sorteos" sub="Horas fijas de cada día. Al guardar se crean los sorteos nuevos de hoy y mañana, y se quitan los que ya no estén en el horario.">
+    <Card title="Horarios de sorteos" sub="El calendario de este juego se repite cada semana. Guarda el horario para aplicar los cambios.">
       <div className="mb-4 flex flex-wrap items-end gap-4">
         <div>
           <label className="label">Cierre de venta</label>
@@ -352,7 +502,9 @@ function Schedule({ cfg, canEdit }: { cfg: GameConfig; canEdit: boolean }) {
         </div>
       </div>
 
-      <div className="-mx-5 overflow-x-auto px-5">
+      {canEdit && <WeeklySchedule disabled={save.isPending} onApply={applyWeekly} />}
+
+      <div className="-mx-5 max-h-96 overflow-auto px-5">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-slate-400">

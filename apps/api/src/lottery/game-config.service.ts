@@ -3,7 +3,9 @@ import { CurrencyCode, formatAmount, parseAmount } from '@loteria/domain';
 import { AuditService } from '../audit/audit.service';
 import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
+import { publish } from '../common/realtime';
 import { DrawLifecycleService } from './draw-lifecycle.service';
+import { MAX_DAILY_SCHEDULE_SLOTS } from './lottery.dto';
 
 type Actor = { id: string; ip?: string };
 
@@ -27,6 +29,24 @@ export class GameConfigService {
     private readonly audit: AuditService,
     private readonly lifecycle: DrawLifecycleService,
   ) {}
+
+  async setAvailability(gameId: string, enabled: boolean, actor: Actor) {
+    const status = enabled ? 'ACTIVE' : 'INACTIVE';
+    return this.db.tx(async (c) => {
+      const { rows: [game] } = await c.query('SELECT status FROM lottery.game WHERE id = $1 FOR UPDATE', [gameId]);
+      if (!game) throw new BusinessError('NOT_FOUND', 'Juego no encontrado');
+      if (game.status === status) return { status };
+
+      await c.query('UPDATE lottery.game SET status = $2 WHERE id = $1', [gameId, status]);
+      if (enabled) await this.lifecycle.generateDraws(gameId, c);
+      await this.audit.log(c, {
+        actorType: 'STAFF', actorId: actor.id, action: 'GAME_AVAILABILITY_UPDATED', entity: 'lottery.game', entityId: gameId,
+        before: { status: game.status }, after: { status }, ip: actor.ip,
+      });
+      await publish(c, 'lobby', 'game-availability', { gameId });
+      return { status };
+    });
+  }
 
   async get(gameId: string) {
     const game = await this.db.one(
@@ -116,7 +136,10 @@ export class GameConfigService {
     for (const s of slots) uniq.set(`${s.weekday}-${s.time}`, s);
     const perDay = new Map<number, number>();
     for (const s of uniq.values()) perDay.set(s.weekday, (perDay.get(s.weekday) ?? 0) + 1);
-    if ([...perDay.values()].some((n) => n > 48)) throw new BusinessError('INVALID_INPUT', 'Máximo 48 sorteos por día');
+    if ([...perDay.values()].some((n) => n > MAX_DAILY_SCHEDULE_SLOTS)) {
+      throw new BusinessError('INVALID_INPUT', `Máximo ${MAX_DAILY_SCHEDULE_SLOTS} sorteos por día`);
+    }
+    const desired = [...uniq.values()];
 
     const result = await this.db.tx(async (c) => {
       const g = (await c.query(`SELECT id, timezone, close_minutes_before FROM lottery.game WHERE id = $1 FOR UPDATE`, [gameId])).rows[0];
@@ -128,21 +151,25 @@ export class GameConfigService {
         )
       ).rows;
 
-      await c.query(`UPDATE lottery.schedule SET active = false WHERE game_id = $1`, [gameId]);
-      for (const s of uniq.values()) {
-        await c.query(
-          `INSERT INTO lottery.schedule (game_id, weekday, draw_time, active) VALUES ($1, $2, $3::time, true)
-           ON CONFLICT (game_id, weekday, draw_time) DO UPDATE SET active = true`,
-          [gameId, s.weekday, s.time],
-        );
-      }
+      await c.query(`UPDATE lottery.schedule SET active = false WHERE game_id = $1 AND active`, [gameId]);
+      await c.query(
+        `INSERT INTO lottery.schedule (game_id, weekday, draw_time, active)
+         SELECT $1, slot.weekday, slot.draw_time, true
+           FROM unnest($2::smallint[], $3::time[]) AS slot(weekday, draw_time)
+         ON CONFLICT (game_id, weekday, draw_time) DO UPDATE SET active = true`,
+        [gameId, desired.map((s) => s.weekday), desired.map((s) => s.time)],
+      );
       if (closeMinutesBefore !== g.close_minutes_before) {
         await c.query(`UPDATE lottery.game SET close_minutes_before = $2 WHERE id = $1`, [gameId, closeMinutesBefore]);
         // Sorteos futuros aún sin cerrar: nuevo cierre de venta.
         await c.query(
-          `UPDATE lottery.draw SET close_at = draw_at - make_interval(mins => $2)
+          `UPDATE lottery.draw
+              SET close_at = draw_at - make_interval(mins => $2),
+                  sales_open_at = CASE WHEN status = 'SCHEDULED' AND NOT is_extraordinary
+                    THEN least(sales_open_at, draw_at - make_interval(mins => $2) - interval '1 minute')
+                    ELSE sales_open_at END
             WHERE game_id = $1 AND sim_player_id IS NULL AND status IN ('SCHEDULED', 'OPEN') AND draw_at > now()
-              AND draw_at - make_interval(mins => $2) >= sales_open_at`,
+              AND (draw_at - make_interval(mins => $2) >= sales_open_at OR (status = 'SCHEDULED' AND NOT is_extraordinary))`,
           [gameId, closeMinutesBefore],
         );
       }
@@ -150,21 +177,25 @@ export class GameConfigService {
       // Sorteos futuros del calendario que ya no corresponden.
       const orphan = (
         await c.query(
-          `SELECT d.id, d.draw_at, EXISTS (SELECT 1 FROM lottery.play p WHERE p.draw_id = d.id) AS has_plays
+          `SELECT d.id, d.draw_at
              FROM lottery.draw d
             WHERE d.game_id = $1 AND d.sim_player_id IS NULL AND NOT d.is_extraordinary
               AND d.status IN ('SCHEDULED', 'OPEN') AND d.draw_at > now()
               AND NOT EXISTS (SELECT 1 FROM lottery.schedule s
                                WHERE s.game_id = d.game_id AND s.active
                                  AND s.weekday = extract(dow FROM d.draw_at AT TIME ZONE $2)
-                                 AND s.draw_time = (d.draw_at AT TIME ZONE $2)::time)`,
+                                 AND s.draw_time = (d.draw_at AT TIME ZONE $2)::time)
+            ORDER BY d.id FOR UPDATE OF d`,
           [gameId, g.timezone],
         )
       ).rows;
-      const removable = orphan.filter((d) => !d.has_plays).map((d) => d.id);
+      const { rows: played } = await c.query(`SELECT DISTINCT draw_id FROM lottery.play WHERE draw_id = ANY($1::uuid[])`, [orphan.map((d) => d.id)]);
+      const withPlays = new Set(played.map((p) => p.draw_id));
+      const removable = orphan.filter((d) => !withPlays.has(d.id)).map((d) => d.id);
       if (removable.length) await c.query(`DELETE FROM lottery.draw WHERE id = ANY($1::uuid[])`, [removable]);
-      const kept = orphan.filter((d) => d.has_plays).map((d) => d.draw_at);
+      const kept = orphan.filter((d) => withPlays.has(d.id)).map((d) => d.draw_at);
 
+      await this.lifecycle.generateDraws(gameId, c);
       await this.audit.log(c, {
         actorType: 'STAFF',
         actorId: actor.id,
@@ -172,12 +203,11 @@ export class GameConfigService {
         entity: 'lottery.game',
         entityId: gameId,
         before: { close_minutes_before: g.close_minutes_before, slots: before },
-        after: { close_minutes_before: closeMinutesBefore, slots: [...uniq.values()], removed_draws: removable.length, kept_with_plays: kept.length },
+        after: { close_minutes_before: closeMinutesBefore, slots: desired, removed_draws: removable.length, kept_with_plays: kept.length },
         ip: actor.ip,
       });
       return { removed: removable.length, keptWithPlays: kept };
     });
-    await this.lifecycle.generateDraws();
     return { ...result, ...(await this.get(gameId)) };
   }
 

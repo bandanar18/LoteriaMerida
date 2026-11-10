@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBox } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { DemoNotice } from '../components/Demo';
 
 declare const __DEV_LOGINS__: { label: string; email: string; password: string }[];
 /** Inyectado por vite.config.ts solo en `vite dev` (vacío en producción). */
@@ -35,6 +36,7 @@ export function LoginPage() {
     <div className="mx-auto max-w-sm">
       <form onSubmit={submit} className="card space-y-4 p-6">
         <h1 className="text-xl font-bold text-selva-900">Entrar</h1>
+        <DemoNotice />
         <div>
           <label className="label" htmlFor="email">Correo</label>
           <input id="email" className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -102,6 +104,7 @@ export function RegisterPage() {
     currency: 'VES',
   });
   const [accept, setAccept] = useState(false);
+  const [acceptDemo, setAcceptDemo] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
@@ -112,8 +115,9 @@ export function RegisterPage() {
     setError(null);
     try {
       const { city, ...rest } = form;
-      await register(city ? form : rest);
-      nav('/billetera', { replace: true });
+      const body = { ...(city ? form : rest), acceptDemoTerms: true };
+      await register(body);
+      nav('/billetera', { replace: true, state: { welcome: true } });
     } catch (err) {
       setError(err);
     } finally {
@@ -127,6 +131,10 @@ export function RegisterPage() {
         <div>
           <h1 className="text-xl font-bold text-selva-900">Crear cuenta</h1>
           <p className="text-sm text-black/50">Debes ser mayor de 18 años. Una cuenta por persona.</p>
+        </div>
+        <DemoNotice />
+        <div className="rounded-xl bg-selva-900/[0.04] px-3 py-2 text-sm text-selva-900 ring-1 ring-selva-700/15">
+          🎁 <b>Bono de bienvenida DEMO:</b> al registrarte recibes <b>Bs. 10.000</b> y <b>10 USDT</b> de saldo de prueba, sin valor real.
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -191,8 +199,12 @@ export function RegisterPage() {
           <input type="checkbox" className="mt-1" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
           Declaro ser mayor de edad y acepto los términos y la política de juego responsable.
         </label>
+        <label className="flex items-start gap-2 text-sm text-black/70">
+          <input type="checkbox" className="mt-1" checked={acceptDemo} onChange={(e) => setAcceptDemo(e.target.checked)} />
+          Entiendo que es una <b>aplicación DEMO</b>: los saldos, bonos y premios no tienen valor real y está prohibida su comercialización.
+        </label>
         <ErrorBox error={error} />
-        <button className="btn-primary w-full" disabled={busy || !accept}>
+        <button className="btn-primary w-full" disabled={busy || !accept || !acceptDemo}>
           {busy ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>
       </form>

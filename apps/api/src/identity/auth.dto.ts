@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsDateString, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength, Equals } from 'class-validator';
 
 export class RegisterDto {
   @IsString() @Length(1, 60) firstName: string;
@@ -15,6 +15,9 @@ export class RegisterDto {
   @IsOptional() @IsString() @MaxLength(60) state?: string;
   @IsOptional() @IsString() @MaxLength(60) city?: string;
   @IsIn(['VES', 'USDT']) currency: 'VES' | 'USDT';
+  /** Acepta que es una aplicación DEMO, sin valor real y sin comercialización. */
+  @Equals(true, { message: 'Debes aceptar que es una aplicación DEMO sin valor real y que no se permite su comercialización' })
+  acceptDemoTerms: boolean;
 }
 
 export class LoginDto {

@@ -1,8 +1,10 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { IsIn, IsOptional, IsString, Length } from 'class-validator';
 import { AuditService } from '../audit/audit.service';
+import { AvailabilityDto } from '../common/availability.dto';
 import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
+import { publish } from '../common/realtime';
 import { localDate } from '../common/time';
 import { AuthUser, ClientIp, CurrentUser, Roles } from '../identity/auth.guard';
 import { LedgerService } from '../wallet/ledger.service';
@@ -24,6 +26,24 @@ export class AdminController {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
   ) {}
+
+  @Roles('ADMIN')
+  @Put('futures/availability')
+  async setFuturesAvailability(@Body() dto: AvailabilityDto, @CurrentUser() u: AuthUser, @ClientIp() ip: string) {
+    return this.db.tx(async (c) => {
+      const { rows: [settings] } = await c.query('SELECT trading_enabled FROM futures.settings WHERE id FOR UPDATE');
+      if (!settings) throw new BusinessError('NOT_FOUND', 'Configuración de Futuros no encontrada');
+      if (settings.trading_enabled === dto.enabled) return { enabled: dto.enabled };
+
+      await c.query('UPDATE futures.settings SET trading_enabled = $1 WHERE id', [dto.enabled]);
+      await this.audit.log(c, {
+        actorType: 'STAFF', actorId: u.id, action: 'FUTURES_AVAILABILITY_UPDATED', entity: 'futures.settings',
+        before: { enabled: settings.trading_enabled }, after: { enabled: dto.enabled }, ip,
+      });
+      await publish(c, 'lobby', 'futures-availability');
+      return { enabled: dto.enabled };
+    });
+  }
 
   /** KPIs del día (zona America/Caracas): ventas, premios, GGR, pendientes. */
   @Get('dashboard')

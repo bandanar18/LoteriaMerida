@@ -1,3 +1,4 @@
+import { grantSignupBonus } from './signup-bonus';
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { isAdult, isValidDocument, normalizeVePhone } from '@loteria/domain';
@@ -44,8 +45,8 @@ export class AuthService {
         const res = await c.query(
           `INSERT INTO identity.app_user
              (kind, role, email, phone, document_type, document_number, first_name, last_name, birth_date,
-              state, city, password_hash, currency_default)
-           VALUES ('PLAYER', 'PLAYER', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              state, city, password_hash, currency_default, demo_terms_accepted_at)
+           VALUES ('PLAYER', 'PLAYER', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
            RETURNING id, role, kind`,
           [
             dto.email.trim().toLowerCase(),
@@ -64,6 +65,8 @@ export class AuthService {
         const u = res.rows[0];
         await this.ledger.playerCash(c, u.id, 'VES');
         await this.ledger.playerCash(c, u.id, 'USDT');
+        // Bono de bienvenida DEMO (10.000 Bs y 10 USDT), en la misma transacción del registro.
+        u.signup_bonus = await grantSignupBonus(c, this.ledger, this.audit, u.id);
         await this.audit.log(c, {
           actorType: 'PLAYER',
           actorId: u.id,
@@ -75,7 +78,7 @@ export class AuthService {
         });
         return u;
       });
-      return this.issueTokens(user, meta);
+      return { ...(await this.issueTokens(user, meta)), signupBonus: user.signup_bonus };
     } catch (err) {
       if (pgErrorCode(err) === '23505') {
         throw new BusinessError('CONFLICT', 'Ya existe una cuenta con ese correo, teléfono o documento');

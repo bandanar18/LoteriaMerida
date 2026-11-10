@@ -1,3 +1,4 @@
+import { parseAmount } from '@loteria/domain';
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 
@@ -24,6 +25,11 @@ export const config = {
   /** Deportes en pausa: por ahora solo se trabaja con animalitos. Con false el API no expone /sports ni /admin/sports. */
   sportsEnabled: (process.env.SPORTS_ENABLED ?? 'false') === 'true',
   licenseLabel: process.env.LICENSE_LABEL ?? '',
+  /** Bono de bienvenida por registro (DEMO), en unidades mínimas: 10.000 Bs y 10 USDT por defecto. */
+  signupBonus: {
+    VES: parseAmount(process.env.SIGNUP_BONUS_VES ?? '10000', 'VES'),
+    USDT: parseAmount(process.env.SIGNUP_BONUS_USDT ?? '10', 'USDT'),
+  },
   kyc: {
     storageDir: resolve(__dirname, '..', process.env.KYC_STORAGE_DIR ?? 'storage/kyc'),
     /** 32 bytes en hex (64 caracteres) para AES-256-GCM. */

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PlayerLayout } from './components/PlayerLayout';
 import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth';
+import { usePlatform } from './lib/queries';
 import { AccountPage } from './pages/Account';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AuditPage } from './pages/admin/Audit';
@@ -32,6 +33,12 @@ function Require({ kind, children }: { kind: 'PLAYER' | 'STAFF'; children: React
   return <>{children}</>;
 }
 
+function FuturesRoute({ children, fallback }: { children: ReactNode; fallback: string }) {
+  const platform = usePlatform();
+  if (platform.isPending) return <Spinner />;
+  return platform.data?.futuresEnabled ? children : <Navigate to={fallback} replace />;
+}
+
 export function App() {
   const { ready } = useAuth();
   if (!ready) return <Spinner />;
@@ -40,7 +47,7 @@ export function App() {
       <Route element={<PlayerLayout />}>
         <Route index element={<PlayPage />} />
         <Route path="resultados" element={<ResultsPage />} />
-        <Route path="futuros" element={<FuturesPage />} />
+        <Route path="futuros" element={<FuturesRoute fallback="/"><FuturesPage /></FuturesRoute>} />
         <Route path="login" element={<LoginPage />} />
         <Route path="registro" element={<RegisterPage />} />
         <Route path="tickets" element={<Require kind="PLAYER"><TicketsPage /></Require>} />
@@ -54,7 +61,7 @@ export function App() {
         <Route path="riesgo" element={<RiskPage />} />
         <Route path="mercado" element={<MarketPage />} />
         <Route path="configuracion" element={<SettingsPage />} />
-        <Route path="futuros" element={<FuturesAdminPage />} />
+        <Route path="futuros" element={<FuturesRoute fallback="/admin"><FuturesAdminPage /></FuturesRoute>} />
         <Route path="pagos" element={<PaymentsPage />} />
         <Route path="kyc" element={<KycPage />} />
         <Route path="jugadores" element={<PlayersPage />} />

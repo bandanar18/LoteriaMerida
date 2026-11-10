@@ -1,7 +1,9 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
+import { usePlatform } from '../../lib/queries';
 import { LiveDot } from '../../lib/realtime';
+import { DemoBanner } from '../../components/Demo';
 
 // ───────────── Íconos (trazo 1.75, 20×20) ─────────────
 
@@ -176,13 +178,19 @@ function useClock() {
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
+  const showFutures = usePlatform().data?.futuresEnabled === true;
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawer, setDrawer] = useState(false);
   const clock = useClock();
 
   const role = user?.role ?? '';
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((n) => !n.roles || role === 'ADMIN' || n.roles.includes(role)) })).filter((g) => g.items.length);
+  const groups = NAV.map((g) => ({
+    ...g,
+    items: g.items.filter((n) =>
+      (showFutures || n.to !== '/admin/futuros') && (!n.roles || role === 'ADMIN' || n.roles.includes(role)),
+    ),
+  })).filter((g) => g.items.length);
   const all = groups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })));
   const current =
     all.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to))) ?? all.find((i) => i.to === '/admin');
@@ -287,7 +295,9 @@ export function AdminLayout() {
       </div>
 
       <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-[72px]' : 'lg:pl-64'}`}>
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/85 px-4 backdrop-blur lg:px-8">
+        <div className="sticky top-0 z-20">
+        <DemoBanner dark />
+        <header className="flex h-16 items-center gap-3 border-b border-slate-200 bg-white/85 px-4 backdrop-blur lg:px-8">
           <button onClick={() => setDrawer(true)} className="-ml-1 rounded-md p-2 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Abrir menú">
             <Icon name="menu" />
           </button>
@@ -316,6 +326,7 @@ export function AdminLayout() {
             </Link>
           </div>
         </header>
+        </div>
         <main className="mx-auto max-w-[1400px] px-4 py-5 lg:px-8 lg:py-6">
           <Outlet />
         </main>

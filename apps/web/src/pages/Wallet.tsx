@@ -4,6 +4,8 @@ import { ErrorBox, Notice, PageTitle, StatusBadge } from '../components/ui';
 import { get, post } from '../lib/api';
 import { Currency, dateTime, money, normalizeAmount } from '../lib/format';
 import { useBalances } from '../lib/queries';
+import { DemoNotice } from '../components/Demo';
+import { useLocation } from 'react-router-dom';
 
 const TX_LABEL: Record<string, string> = {
   DEPOSIT: 'Depósito',
@@ -28,10 +30,20 @@ const STATUS_LABEL: Record<string, string> = {
 export function WalletPage() {
   const balances = useBalances(true);
   const [tab, setTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
+  const welcome = !!(useLocation().state as { welcome?: boolean } | null)?.welcome;
 
   return (
     <div className="space-y-4">
       <PageTitle>Billetera</PageTitle>
+      {welcome && (
+        <div className="rounded-2xl bg-gradient-to-r from-selva-700 to-selva-600 px-4 py-3 text-white">
+          <div className="text-lg font-extrabold">🎁 ¡Bienvenido a FortunaBet!</div>
+          <p className="text-sm text-white/85">
+            Te acreditamos tu bono de bienvenida DEMO: <b>Bs. 10.000</b> y <b>10 USDT</b> de saldo de prueba. No tiene valor real y no se puede cobrar.
+          </p>
+        </div>
+      )}
+      <DemoNotice />
       <div className="grid gap-3 sm:grid-cols-2">
         {balances.data?.map((b) => (
           <div key={b.currency} className="card bg-gradient-to-br from-selva-800 to-selva-700 p-5 text-white">

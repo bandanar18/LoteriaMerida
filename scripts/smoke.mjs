@@ -312,10 +312,28 @@ const fresh = await call('POST', '/auth/register', {
     birthDate: '1995-03-10',
     phone: `0412${stamp}`,
     currency: 'VES',
+    acceptDemoTerms: true,
   },
 });
 const kycPlayer = fresh.data?.accessToken;
 ok(kycPlayer, 'jugador nuevo registrado (nivel 1)');
+ok(fresh.data?.signupBonus?.VES === '1000000' && fresh.data?.signupBonus?.USDT === '10000000', 'bono de bienvenida DEMO: Bs. 10.000 y 10 USDT');
+const freshBal = (await call('GET', '/me/balances', { token: kycPlayer })).data;
+ok(freshBal.find((b) => b.currency === 'VES')?.cash === '1000000' && freshBal.find((b) => b.currency === 'USDT')?.cash === '10000000', 'el bono queda en el saldo del jugador');
+const noDemo = await call('POST', '/auth/register', {
+  body: {
+    email: `nodemo${stamp}@loteria.test`,
+    password: `Kyc.Prueba.${stamp}!`,
+    documentType: 'V',
+    documentNumber: `3${stamp}`,
+    firstName: 'Sin',
+    lastName: 'Demo',
+    birthDate: '1995-03-10',
+    phone: `0416${stamp}`,
+    currency: 'VES',
+  },
+});
+ok(noDemo.data?.code === 'INVALID_INPUT' && /DEMO/.test(noDemo.data.message), 'sin aceptar el aviso DEMO no se puede registrar');
 const noWd = await call('POST', '/payments/withdrawals', { token: kycPlayer, body: { method: 'PAGO_MOVIL', amount: '10', bank: '0102', account: '04141234567' } });
 ok(noWd.data?.code === 'KYC_REQUIRED', `nivel 1 no puede retirar (${noWd.data?.code})`);
 const bigDep = await call('POST', '/payments/deposits', { token: kycPlayer, body: { method: 'TRANSFER', amount: '25000', bank: '0134', reference: `K${stamp}A` } });

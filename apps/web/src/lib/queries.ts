@@ -75,7 +75,15 @@ export interface Balance {
   locked: string;
 }
 
-export const useGames = () => useQuery({ queryKey: ['games'], queryFn: () => get<Game[]>('/lottery/games'), staleTime: 300_000 });
+export type AdminGame = Game & { status: 'ACTIVE' | 'INACTIVE' };
+
+export const useGames = () => useQuery({
+  queryKey: ['games'], queryFn: () => get<Game[]>('/lottery/games'), staleTime: 60_000, refetchInterval: 60_000,
+});
+
+export const useAdminGames = () => useQuery({
+  queryKey: ['admin', 'games'], queryFn: () => get<AdminGame[]>('/admin/lottery/games'), refetchInterval: 60_000,
+});
 
 export const useDraws = (gameId: string | undefined, date?: string) =>
   useQuery({
@@ -96,7 +104,10 @@ export const useSimulationStatus = () =>
   useQuery({ queryKey: ['simulation-status'], staleTime: 300_000, queryFn: () => get<{ enabled: boolean; maxTopup: Record<Currency, string> }>('/simulation/status') });
 
 export const usePlatform = () =>
-  useQuery({ queryKey: ['platform'], staleTime: Infinity, queryFn: () => get<{ licenseLabel: string }>('/platform') });
+  useQuery({
+    queryKey: ['platform'], staleTime: 60_000, refetchInterval: 60_000,
+    queryFn: () => get<{ licenseLabel: string; futuresEnabled: boolean }>('/platform'),
+  });
 
 /** Cómo se llaman los símbolos de cada juego: animales (MER-05) o frutas (MER-03). */
 export function symbolWords(game: Pick<Game, 'code'> | undefined) {

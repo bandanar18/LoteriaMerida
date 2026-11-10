@@ -1,5 +1,7 @@
 # FortunaBet — MVP (Fase 0 + 1)
 
+> ⚠️ **APLICACIÓN DEMO.** Los saldos, bonos, apuestas, premios y operaciones no tienen valor real; no se aceptan ni se pagan montos reales y no está autorizada por ningún ente regulador. **Se prohíbe su comercialización, reventa o uso con fines comerciales.**
+
 Primer MVP de la plataforma descrita en el *Documento Maestro*: núcleo financiero (ledger de doble partida, auditoría, RNG) y el primer producto, **Animalitos**, con web de jugador y backoffice.
 
 > Solo para desarrollo/demostración con dinero ficticio. Operar con dinero real requiere licencia (CNC / CONALOT-IOBPAS) y asesoría legal (Doc. Maestro §2).
@@ -33,7 +35,17 @@ scripts/smoke.mjs Prueba end-to-end del API
 
 ## Puesta en marcha
 
-Requisitos: Node 22+, Docker Desktop.
+Requisitos: Node 22+, Docker Desktop (abierto).
+
+### Un solo comando
+
+```bash
+npm run dev
+```
+
+Enciende la base de datos (Docker), aplica migraciones, carga los datos iniciales (no duplica) y arranca la API (http://localhost:3000) y la web (http://localhost:5173) en la misma terminal. **Ctrl+C** apaga la API y la web; la base de datos sigue encendida (`npm run db:down` para apagarla). La primera vez instala las dependencias si faltan; necesita `apps/api/.env` (cópialo de `apps/api/.env.example`). Opciones: `npm run dev -- --sin-seed` (no recarga datos iniciales).
+
+### Paso a paso
 
 ```bash
 npm install

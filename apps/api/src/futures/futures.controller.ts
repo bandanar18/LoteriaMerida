@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
 import { AuthUser, CurrentUser, Public, Roles } from '../identity/auth.guard';
+import { FuturesAvailabilityGuard } from './futures-availability.guard';
 import { FuturesService } from './futures.service';
 
 const DEC = /^\d{1,12}(\.\d{1,8})?$/;
@@ -53,6 +54,7 @@ export class FuturesSettingsDto {
 }
 
 @Controller('futures')
+@UseGuards(FuturesAvailabilityGuard)
 export class FuturesController {
   constructor(
     private readonly futures: FuturesService,

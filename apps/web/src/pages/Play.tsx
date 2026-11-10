@@ -124,7 +124,7 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
     setSelectedSymbols(sym ? [sym.id] : []);
   }, [isDigits, digits, k, symbolByNumber]);
   const draws = useMemo(
-    () => [...(todayDraws.data ?? []), ...(tomorrowDraws.data ?? []).filter((d) => d.is_automatic)],
+    () => [...(todayDraws.data ?? []), ...(tomorrowDraws.data ?? [])],
     [todayDraws.data, tomorrowDraws.data],
   );
   const openDraws = sim ? [sim.draw] : draws.filter((d) => d.status === 'OPEN' && new Date(d.close_at).getTime() > now);
@@ -302,6 +302,7 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
             <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
               {openDraws.map((d) => {
                 const active = selectedDraws.includes(d.id);
+                const tomorrow = todayCaracas(new Date(d.draw_at)) !== today;
                 return (
                   <button
                     key={d.id}
@@ -319,9 +320,9 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
                         <div className="text-base font-bold">
                           {hour(d.draw_at)} {d.is_extraordinary && <span title="Sorteo extraordinario">⭐</span>}
                         </div>
-                        {d.is_automatic && (
+                        {(tomorrow || d.is_automatic) && (
                           <div className={`text-[11px] font-semibold ${active ? 'text-white/90' : 'text-sky-800'}`}>
-                            {todayCaracas(new Date(d.draw_at)) !== today && 'Mañana · '}Automático
+                            {tomorrow ? 'Mañana' : ''}{tomorrow && d.is_automatic ? ' · ' : ''}{d.is_automatic ? 'Automático' : ''}
                           </div>
                         )}
                         <div className={`text-[11px] tabular-nums ${active ? 'text-white/80' : 'text-black/50'}`}>cierra en {countdown(d.close_at, now)}</div>

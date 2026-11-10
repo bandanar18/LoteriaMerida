@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsNumber, IsString, Length, Max, Min, ValidateNested } from 'class-validator';
@@ -8,6 +8,7 @@ import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
 import { AuthUser, ClientIp, CurrentUser, Roles } from '../identity/auth.guard';
 import { FeedService } from './feed.service';
+import { FuturesAvailabilityGuard } from './futures-availability.guard';
 import { FuturesService } from './futures.service';
 
 const usdt = (micro: bigint | string) => formatFx(BigInt(micro), 6, 6);
@@ -40,6 +41,7 @@ export class FuturesSettingsAdminDto {
 /** Backoffice de Cumbre Futuros: salud del feed, exposición, resultado de la casa, liquidaciones y configuración. */
 @Roles('LOTTERY_OPERATOR', 'AUDITOR')
 @Controller('admin/futures')
+@UseGuards(FuturesAvailabilityGuard)
 export class FuturesAdminController {
   constructor(
     private readonly db: DbService,

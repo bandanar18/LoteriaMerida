@@ -3,16 +3,16 @@ import { useState } from 'react';
 import { ErrorBox, Modal, Notice, PageTitle, Spinner, StatusBadge } from '../../components/ui';
 import { get, getBlob, post } from '../../lib/api';
 import { Currency, dateTime, DRAW_STATUS_LABEL, hour, money, todayCaracas } from '../../lib/format';
-import { Game, symbolWords, useGames } from '../../lib/queries';
+import { Game, symbolWords, useAdminGames } from '../../lib/queries';
 import { NumberBalls } from '../../components/SymbolArt';
 
 export function DrawsPage() {
-  const games = useGames();
+  const games = useAdminGames();
   const [gameId, setGameId] = useState<string>();
   const [date, setDate] = useState(todayCaracas());
   const [selected, setSelected] = useState<string | null>(null);
   const [extraOpen, setExtraOpen] = useState(false);
-  const game = games.data?.find((g) => g.id === gameId) ?? games.data?.[0];
+  const game = games.data?.find((g) => g.id === gameId) ?? games.data?.find((g) => g.status === 'ACTIVE') ?? games.data?.[0];
   const draws = useQuery({
     queryKey: ['admin', 'draws', game?.id, date],
     enabled: !!game,
@@ -33,12 +33,12 @@ export function DrawsPage() {
             >
               {games.data?.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name} ({g.result_source === 'INTERNAL_RNG' ? 'RNG' : 'manual'})
+                  {g.name} ({g.result_source === 'INTERNAL_RNG' ? 'RNG' : 'manual'}){g.status === 'INACTIVE' ? ' · Deshabilitado' : ''}
                 </option>
               ))}
             </select>
             <input type="date" className="input sm:w-auto" value={date} onChange={(e) => setDate(e.target.value)} />
-            <button className="btn-gold" onClick={() => setExtraOpen(true)}>
+            <button className="btn-gold" disabled={game?.status !== 'ACTIVE'} onClick={() => setExtraOpen(true)}>
               + Sorteo extraordinario
             </button>
           </div>

@@ -3,6 +3,7 @@ import { Body, Controller, Get, Header, HttpCode, Param, ParseBoolPipe, ParseUUI
 import { FileInterceptor } from '@nestjs/platform-express';
 import { KYC_MAX_FILE_BYTES } from '@loteria/domain';
 import type { Response } from 'express';
+import { AvailabilityDto } from '../common/availability.dto';
 import { DbService } from '../common/db.service';
 import { localDate } from '../common/time';
 import { AuthUser, ClientIp, CurrentUser, Roles } from '../identity/auth.guard';
@@ -42,6 +43,17 @@ export class LotteryAdminController {
     private readonly analytics: AnalyticsService,
     private readonly gameConfig: GameConfigService,
   ) {}
+
+  @Get('games')
+  games() {
+    return this.lottery.listGames(true);
+  }
+
+  @Roles('ADMIN')
+  @Put('games/:id/availability')
+  setAvailability(@Param('id', ParseUUIDPipe) gameId: string, @Body() dto: AvailabilityDto, @CurrentUser() u: AuthUser, @ClientIp() ip: string) {
+    return this.gameConfig.setAvailability(gameId, dto.enabled, { id: u.id, ip });
+  }
 
   /** Configuración del juego: montos por moneda y calendario de sorteos. */
   @Get('games/:id/config')

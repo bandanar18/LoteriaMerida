@@ -13,7 +13,8 @@ export type AccountType =
   | 'PLAYER_FUTURES'
   | 'FUTURES_MARGIN'
   | 'HOUSE_FUTURES_FEES'
-  | 'HOUSE_FUTURES_PNL';
+  | 'HOUSE_FUTURES_PNL'
+  | 'HOUSE_PROMOTIONS';
 export type RefProduct = 'LOTTERY' | 'SPORTS' | 'PAYMENT' | 'ADJUST' | 'FUTURES';
 
 export interface AccountSpec {

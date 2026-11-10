@@ -142,11 +142,14 @@ export class HistoryRangeDto {
   @Matches(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/, { message: 'Fecha final inválida' }) to: string;
 }
 
+export const MAX_DAILY_SCHEDULE_SLOTS = 24 * 60 / 5;
+
 export class GameScheduleDto {
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ScheduleSlotDto)
   @ArrayMinSize(1, { message: 'El juego necesita al menos un sorteo por semana' })
-  @ArrayMaxSize(7 * 48)
+  @ArrayMaxSize(7 * MAX_DAILY_SCHEDULE_SLOTS)
   slots: ScheduleSlotDto[];
   @Type(() => Number) @IsInt() @Min(1) @Max(120) closeMinutesBefore: number;
 }

@@ -91,6 +91,11 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     return { price: f.index, tickId: f.tickId };
   }
 
+  private async enabled() {
+    const settings = await this.db.one<{ trading_enabled: boolean }>('SELECT trading_enabled FROM futures.settings WHERE id');
+    return settings?.trading_enabled === true;
+  }
+
   private async fetchSpot() {
     const now = Date.now();
     const put = (sym: string, src: string, v: unknown) => {
@@ -125,7 +130,12 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     if (this.running) return; // un tick a la vez
     this.running = true;
     try {
+      if (!(await this.enabled())) {
+        for (const feed of this.feeds.values()) feed.ok = false;
+        return;
+      }
       await this.fetchSpot();
+      if (!(await this.enabled())) return;
       const now = Date.now();
       for (const symbol of this.feeds.keys()) {
         const fresh = Object.entries(this.last[symbol]).filter(([, v]) => now - v.at <= STALE_SOURCE_MS);
@@ -166,7 +176,8 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
   /** Salto anómalo: más de 10 % frente al índice de hace ~1 minuto → contrato en pausa e incidencia (manual §3.4). */
   private async checkJump(symbol: string, index: bigint) {
     const prev = await this.db.one<{ index_price: string }>(
-      `SELECT index_price::text FROM futures.price_tick WHERE symbol = $1 AND created_at <= now() - interval '60 seconds'
+      `SELECT index_price::text FROM futures.price_tick WHERE symbol = $1
+          AND created_at BETWEEN now() - interval '2 minutes' AND now() - interval '60 seconds'
         ORDER BY created_at DESC LIMIT 1`,
       [symbol],
     );
@@ -188,6 +199,12 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
 
   /** Tasas de funding publicadas por el mercado (mediana, con tope de la plataforma). */
   private async fetchFunding() {
+    const enabled = await this.enabled().catch((error: Error) => {
+      this.log.error(`Funding: ${error.message}`);
+      return false;
+    });
+    if (!enabled) return;
+
     for (const s of Object.keys(SYMBOLS) as Sym[]) {
       const m = SYMBOLS[s];
       const rates: Record<string, string> = {};

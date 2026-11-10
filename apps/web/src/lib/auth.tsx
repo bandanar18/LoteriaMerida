@@ -6,7 +6,7 @@ interface AuthState {
   user: SessionUser | null;
   ready: boolean;
   login: (email: string, password: string) => Promise<SessionUser>;
-  register: (data: Record<string, string>) => Promise<SessionUser>;
+  register: (data: Record<string, unknown>) => Promise<SessionUser>;
   logout: () => Promise<void>;
 }
 

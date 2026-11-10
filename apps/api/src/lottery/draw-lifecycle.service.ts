@@ -84,30 +84,44 @@ export class DrawLifecycleService {
   }
 
   /** Crea los sorteos de hoy y mañana a partir del calendario (idempotente). */
-  async generateDraws() {
-    const candidates = await this.db.query(
-      `SELECT g.id AS game_id, g.close_minutes_before,
-              ((day.d + s.draw_time) AT TIME ZONE g.timezone) AS draw_at,
-              (day.d::timestamp AT TIME ZONE g.timezone) AS sales_open_at
-         FROM lottery.game g
-         JOIN lottery.schedule s ON s.game_id = g.id AND s.active
-         CROSS JOIN LATERAL (SELECT ((now() AT TIME ZONE g.timezone)::date + k) AS d FROM generate_series(0, 1) k) day
-        WHERE g.status = 'ACTIVE'
-          AND extract(dow FROM day.d) = s.weekday
-          AND ((day.d + s.draw_time) AT TIME ZONE g.timezone) - make_interval(mins => g.close_minutes_before) > now()
-          AND NOT EXISTS (SELECT 1 FROM lottery.draw x
-                           WHERE x.game_id = g.id AND x.draw_at = ((day.d + s.draw_time) AT TIME ZONE g.timezone))`,
-    );
-    for (const c of candidates) {
-      const { serverSeed, seedHash } = this.rng.newCommitment();
-      await this.db.query(
-        `INSERT INTO lottery.draw (game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed)
-         VALUES ($1, $2, $3, $2::timestamptz - make_interval(mins => $4), $5, $6)
-         ON CONFLICT (game_id, draw_at) DO NOTHING`,
-        [c.game_id, c.draw_at, c.sales_open_at, c.close_minutes_before, seedHash, serverSeed],
+  async generateDraws(gameId: string | null = null, transaction?: Db) {
+    const generate = async (db: Db) => {
+      // La configuración bloquea la misma fila antes de reemplazar el calendario.
+      await db.query(
+        `SELECT id FROM lottery.game WHERE status = 'ACTIVE' AND ($1::uuid IS NULL OR id = $1) ORDER BY id FOR SHARE`,
+        [gameId],
       );
-    }
-    if (candidates.length) this.log.log(`Sorteos generados: ${candidates.length}`);
+      const { rows: candidates } = await db.query(
+        `SELECT g.id AS game_id, times.draw_at, closing.close_at,
+                least(day.d::timestamp AT TIME ZONE g.timezone, closing.close_at - interval '1 minute') AS sales_open_at
+           FROM lottery.game g
+           JOIN lottery.schedule s ON s.game_id = g.id AND s.active
+           CROSS JOIN LATERAL (SELECT ((now() AT TIME ZONE g.timezone)::date + k) AS d FROM generate_series(0, 1) k) day
+           CROSS JOIN LATERAL (SELECT (day.d + s.draw_time) AT TIME ZONE g.timezone AS draw_at) times
+           CROSS JOIN LATERAL (SELECT times.draw_at - make_interval(mins => g.close_minutes_before) AS close_at) closing
+          WHERE g.status = 'ACTIVE' AND ($1::uuid IS NULL OR g.id = $1)
+            AND extract(dow FROM day.d) = s.weekday AND closing.close_at > now()
+            AND NOT EXISTS (SELECT 1 FROM lottery.draw x WHERE x.game_id = g.id AND x.draw_at = times.draw_at)`,
+        [gameId],
+      );
+      if (!candidates.length) return 0;
+      const draws = candidates.map((draw) => {
+        const { serverSeed, seedHash } = this.rng.newCommitment();
+        return { ...draw, seed_hash: seedHash, server_seed: serverSeed };
+      });
+      const { rowCount } = await db.query(
+        `INSERT INTO lottery.draw (game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed)
+         SELECT game_id, draw_at, sales_open_at, close_at, seed_hash, server_seed
+           FROM jsonb_to_recordset($1::jsonb) AS d(
+             game_id uuid, draw_at timestamptz, sales_open_at timestamptz, close_at timestamptz, seed_hash text, server_seed text
+           )
+         ON CONFLICT (game_id, draw_at) DO NOTHING`,
+        [JSON.stringify(draws)],
+      );
+      return rowCount ?? 0;
+    };
+    const count = transaction ? await generate(transaction) : await this.db.tx(generate);
+    if (count) this.log.log(`Sorteos generados: ${count}`);
   }
 
   async createExtraordinaryDraw(gameId: string, minutesFromNow: number, actor: Actor, auto = false) {
@@ -121,7 +135,7 @@ export class DrawLifecycleService {
 
   private async createExtraordinaryDrawTx(gameId: string, minutesFromNow: number, actor: Actor, auto: boolean) {
     return this.db.tx(async (c) => {
-      const g = (await c.query(`SELECT * FROM lottery.game WHERE id = $1 AND status = 'ACTIVE'`, [gameId])).rows[0];
+      const g = (await c.query(`SELECT * FROM lottery.game WHERE id = $1 AND status = 'ACTIVE' FOR SHARE`, [gameId])).rows[0];
       if (!g) throw new BusinessError('NOT_FOUND', 'Juego no encontrado');
       if (minutesFromNow <= g.close_minutes_before) {
         if (auto && config.simulationMode && g.is_demo) {

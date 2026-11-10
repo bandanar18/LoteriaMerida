@@ -80,11 +80,12 @@ export class LotteryService {
 
   // ───────────── Lectura pública ─────────────
 
-  async listGames() {
+  async listGames(includeInactive = false) {
     const games = await this.db.query(
       `SELECT id, code, name, result_source, payout_multiplier::text, close_minutes_before, cancel_window_minutes,
-              timezone, license_ref, rules_version, is_demo, requires_record, publish_preliminary, prize_expiry_days, board, draw_count
-         FROM lottery.game WHERE status = 'ACTIVE' ORDER BY display_order, name`,
+              timezone, license_ref, rules_version, is_demo, requires_record, publish_preliminary, prize_expiry_days, board, draw_count, status
+         FROM lottery.game WHERE ($1::boolean OR status = 'ACTIVE') ORDER BY display_order, name`,
+      [includeInactive],
     );
     for (const g of games) {
       g.modalities = await this.db.query(
@@ -334,7 +335,7 @@ export class LotteryService {
       `SELECT g.id, g.code, g.name, g.license_ref, g.rules_version, g.is_demo, g.board, g.draw_count,
               l.min_play, l.max_play, l.max_ticket, l.max_liability_per_symbol, l.max_player_per_draw
          FROM lottery.game g JOIN lottery.game_limit l ON l.game_id = g.id AND l.currency = $2
-        WHERE g.id = $1 AND g.status = 'ACTIVE'`,
+        WHERE g.id = $1 AND g.status = 'ACTIVE' FOR SHARE OF g`,
       [dto.gameId, currency],
     );
     const game = gameRes.rows[0];

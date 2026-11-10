@@ -11,6 +11,7 @@ export default defineConfig(({ command }) => {
       ? [
           { label: 'Administrador', email: seed.SEED_ADMIN_EMAIL, password: seed.SEED_ADMIN_PASSWORD },
           { label: 'Jugador', email: seed.SEED_PLAYER_EMAIL, password: seed.SEED_PLAYER_PASSWORD },
+          ...[1, 2, 3, 4, 5].map((n) => ({ label: `Prueba ${n}`, email: `prueba${n}@fortunabet.test`, password: seed.SEED_TEST_PLAYERS_PASSWORD })),
         ].filter((l) => l.email && l.password)
       : [];
 

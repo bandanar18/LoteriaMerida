@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import { AuditService } from '../audit/audit.service';
 import { config } from '../config';
 import { LedgerService } from '../wallet/ledger.service';
+import { grantSignupBonus } from '../identity/signup-bonus';
 import { seedSports } from './seed-sports';
 
 /**
@@ -171,6 +172,15 @@ const GAMES = [
   },
 ];
 
+/** Jugadores de prueba DEMO. Datos ficticios; la contraseña común viene de SEED_TEST_PLAYERS_PASSWORD (.env). */
+const TEST_PLAYERS = [
+  { email: 'prueba1@fortunabet.test', first: 'Ana', last: 'Pérez', doc: '20111111', phone: '584140000011', birth: '1992-03-14', state: 'Mérida', city: 'Mérida', currency: 'VES', kyc: 2 },
+  { email: 'prueba2@fortunabet.test', first: 'Luis', last: 'Rondón', doc: '20222222', phone: '584140000012', birth: '1988-07-02', state: 'Táchira', city: 'San Cristóbal', currency: 'USDT', kyc: 2 },
+  { email: 'prueba3@fortunabet.test', first: 'María', last: 'Gil', doc: '20333333', phone: '584140000013', birth: '1995-11-21', state: 'Zulia', city: 'Maracaibo', currency: 'VES', kyc: 2 },
+  { email: 'prueba4@fortunabet.test', first: 'Carlos', last: 'Mora', doc: '20444444', phone: '584140000014', birth: '1990-01-30', state: 'Lara', city: 'Barquisimeto', currency: 'VES', kyc: 1 },
+  { email: 'prueba5@fortunabet.test', first: 'Sofía', last: 'Díaz', doc: '20555555', phone: '584140000015', birth: '1999-05-09', state: 'Distrito Capital', city: 'Caracas', currency: 'USDT', kyc: 1 },
+];
+
 async function main() {
   const pool = new Pool({ connectionString: config.databaseUrl });
   const ledger = new LedgerService();
@@ -291,6 +301,27 @@ async function main() {
           entityId: upgraded.rows[0].id,
           after: { level: 2, reason: 'Jugador demo del seed' },
         });
+      }
+    }
+
+    // 5 jugadores de prueba (DEMO): se crean como un registro normal, con el bono de bienvenida por el ledger.
+    // Los tres primeros vienen verificados (nivel 2: pueden retirar y operar futuros); los dos últimos en nivel 1.
+    const testPassword = process.env.SEED_TEST_PLAYERS_PASSWORD;
+    if (testPassword) {
+      const hash = await argon2.hash(testPassword, { type: argon2.argon2id });
+      for (const t of TEST_PLAYERS) {
+        const r = await client.query(
+          `INSERT INTO identity.app_user (kind, role, email, phone, document_type, document_number, first_name, last_name,
+                                          birth_date, state, city, password_hash, currency_default, kyc_level, demo_terms_accepted_at)
+           VALUES ('PLAYER', 'PLAYER', $1, $2, 'V', $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+           ON CONFLICT DO NOTHING RETURNING id`,
+          [t.email, t.phone, t.doc, t.first, t.last, t.birth, t.state, t.city, hash, t.currency, t.kyc],
+        );
+        if (!r.rows[0]) continue;
+        await ledger.playerCash(client, r.rows[0].id, 'VES');
+        await ledger.playerCash(client, r.rows[0].id, 'USDT');
+        await grantSignupBonus(client, ledger, audit, r.rows[0].id);
+        await audit.log(client, { actorType: 'SYSTEM', action: 'SEED_TEST_PLAYER_CREATED', entity: 'app_user', entityId: r.rows[0].id, after: { email: t.email, kyc: t.kyc } });
       }
     }
 

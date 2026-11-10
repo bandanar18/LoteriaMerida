@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { money } from '../lib/format';
 import { useBalances, usePlatform } from '../lib/queries';
 import { LiveDot } from '../lib/realtime';
+import { DemoBanner, DemoNotice } from './Demo';
 
 const NAV = [
   { to: '/', label: 'Jugar', icon: '🎲', end: true },
@@ -18,6 +19,8 @@ export function PlayerLayout() {
   const isPlayer = user?.kind === 'PLAYER';
   const balances = useBalances(isPlayer);
   const platform = usePlatform();
+  const hideFutures = platform.data?.futuresEnabled !== true;
+  const nav = hideFutures ? NAV.filter((item) => item.to !== '/futuros') : NAV;
 
   return (
     <div className="flex min-h-dvh flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
@@ -30,7 +33,7 @@ export function PlayerLayout() {
             </span>
           </Link>
           <nav className="ml-6 hidden gap-1 md:flex">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -73,6 +76,7 @@ export function PlayerLayout() {
             )}
           </div>
         </div>
+        <DemoBanner />
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">
@@ -80,12 +84,13 @@ export function PlayerLayout() {
       </main>
 
       <footer className="border-t border-black/5 bg-white/60 py-4 text-center text-xs text-black/50">
+        <DemoNotice className="mx-auto mb-3 max-w-2xl text-left" />
         <p>{platform.data?.licenseLabel}</p>
         <p className="mt-1">Solo mayores de 18 años · Juega con responsabilidad · Horario: America/Caracas</p>
       </footer>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        {NAV.map((n) => (
+      <nav className={`fixed inset-x-0 bottom-0 z-40 grid ${hideFutures ? 'grid-cols-5' : 'grid-cols-6'} border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] md:hidden`}>
+        {nav.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}

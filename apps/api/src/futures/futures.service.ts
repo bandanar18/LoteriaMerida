@@ -128,6 +128,11 @@ export class FuturesService implements OnModuleInit {
     return c.status === 'ACTIVE' && !!this.feed.mark(c.symbol);
   }
 
+  private async tradingEnabled(c: PoolClient) {
+    const { rows: [settings] } = await c.query('SELECT trading_enabled FROM futures.settings WHERE id FOR SHARE');
+    return settings?.trading_enabled === true;
+  }
+
   // ───────────── Cuentas del jugador ─────────────
 
   private wallet(c: PoolClient | DbService['pool'], playerId: string) {
@@ -167,6 +172,9 @@ export class FuturesService implements OnModuleInit {
     const result = await this.db.tx(async (c) => {
       const existing = await c.query(`SELECT id FROM futures.order WHERE player_id = $1 AND idempotency_key = $2`, [playerId, idempotencyKey]);
       if (existing.rows[0]) return { orderId: existing.rows[0].id as string, duplicate: true };
+      if (!(await this.tradingEnabled(c))) {
+        throw new BusinessError('NOT_FOUND', 'Futuros no está disponible');
+      }
       await this.assertCanTrade(c, playerId);
       // Un jugador a la vez (evita carreras entre sus propias órdenes).
       await c.query(`SELECT pg_advisory_xact_lock(hashtext('futures-player:' || $1))`, [playerId]);
@@ -616,6 +624,9 @@ export class FuturesService implements OnModuleInit {
     }
     if (a <= 0n) throw new BusinessError('INVALID_INPUT', 'Monto inválido');
     return this.db.tx(async (c) => {
+      if (!(await this.tradingEnabled(c))) {
+        throw new BusinessError('NOT_FOUND', 'Futuros no está disponible');
+      }
       await assertPlayerCanPlay(c, playerId);
       await c.query(`SELECT pg_advisory_xact_lock(hashtext('futures-player:' || $1))`, [playerId]);
       const cash = await this.ledger.playerCash(c, playerId, CUR);
@@ -686,13 +697,17 @@ export class FuturesService implements OnModuleInit {
     if (this.engineBusy.has(symbol)) return;
     this.engineBusy.add(symbol);
     try {
-      const mark = this.feed.mark(symbol);
-      if (!mark) return; // feed caído: ni llenados ni liquidaciones (manual §3.4)
-      await this.liquidations(symbol, mark.price, mark.tickId);
-      await this.triggerTpSl(symbol, mark.price, mark.tickId);
-      await this.triggerOrders(symbol, mark.price, mark.tickId);
-      await this.funding(symbol, mark.price);
-      await this.houseLossGuard();
+      // El interruptor espera a que termine el ciclo en curso, incluido el funding.
+      await this.db.tx(async (c) => {
+        if (!(await this.tradingEnabled(c))) return;
+        const mark = this.feed.mark(symbol);
+        if (!mark) return;
+        await this.liquidations(symbol, mark.price, mark.tickId);
+        await this.triggerTpSl(symbol, mark.price, mark.tickId);
+        await this.triggerOrders(symbol, mark.price, mark.tickId);
+        await this.funding(symbol, mark.price);
+        await this.houseLossGuard();
+      });
     } finally {
       this.engineBusy.delete(symbol);
     }
