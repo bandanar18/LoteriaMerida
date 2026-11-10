@@ -3,11 +3,13 @@
  * Enciende todo FortunaBet (DEMO) con un solo comando: `npm run dev`.
  *
  *   1. Base de datos (Docker) y espera a que esté lista.
- *   2. Compila el dominio, aplica migraciones y carga los datos iniciales (idempotente).
+ *   2. Compila el dominio, aplica migraciones, carga los datos iniciales (idempotente) y genera los resultados
+ *      de muestra de los últimos 3 días (la base de datos no está en el repositorio).
  *   3. API (http://localhost:3000) y web (http://localhost:5173) juntas, con su salida en esta terminal.
  *
  * Ctrl+C apaga la API y la web. La base de datos queda encendida (`npm run db:down` para apagarla).
- * Opciones: --sin-seed (no recarga datos iniciales), --sin-db (no toca Docker).
+ * Opciones: --sin-seed (no recarga datos iniciales ni historial), --sin-historial (no genera resultados de muestra),
+ *           --sin-db (no toca Docker).
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -72,6 +74,15 @@ if (!args.has('--sin-db')) {
 // 2) Dominio, migraciones y datos iniciales.
 run('Compilando reglas del dominio y aplicando migraciones…', 'npm', ['run', 'migrate']);
 if (!args.has('--sin-seed')) run('Cargando datos iniciales (juegos, usuarios de prueba; no duplica)…', 'npm', ['run', 'seed']);
+// La base de datos no viaja en el repositorio: cada instalación genera su propio historial de muestra
+// (hoy y los 2 días anteriores, de 8 a. m. a 8 p. m. cada hora) con el RNG provably fair. Solo llena lo que falta.
+if (!args.has('--sin-seed') && !args.has('--sin-historial')) {
+  say('Generando resultados de muestra (últimos 3 días, 8 a. m. – 8 p. m.; solo lo que falta)…');
+  const r = spawnSync('npm', ['run', 'simulate:history', '-w', '@loteria/api', '--silent', '--', '2', '--desde', '8', '--hasta', '20'], {
+    cwd: root, stdio: 'inherit', shell: isWin,
+  });
+  if (r.status !== 0) say('No se pudo generar el historial de muestra; el sistema arranca igual.', 'warn');
+}
 
 // 3) API y web.
 const children = [];

@@ -43,7 +43,9 @@ Requisitos: Node 22+, Docker Desktop (abierto).
 npm run dev
 ```
 
-Enciende la base de datos (Docker), aplica migraciones, carga los datos iniciales (no duplica) y arranca la API (http://localhost:3000) y la web (http://localhost:5173) en la misma terminal. **Ctrl+C** apaga la API y la web; la base de datos sigue encendida (`npm run db:down` para apagarla). La primera vez instala las dependencias si faltan; necesita `apps/api/.env` (cópialo de `apps/api/.env.example`). Opciones: `npm run dev -- --sin-seed` (no recarga datos iniciales).
+Enciende la base de datos (Docker), aplica migraciones, carga los datos iniciales (no duplica) y arranca la API (http://localhost:3000) y la web (http://localhost:5173) en la misma terminal. **Ctrl+C** apaga la API y la web; la base de datos sigue encendida (`npm run db:down` para apagarla). La primera vez instala las dependencias si faltan; necesita `apps/api/.env` (cópialo de `apps/api/.env.example`). Opciones: `npm run dev -- --sin-seed` (no recarga datos iniciales), `npm run dev -- --sin-historial` (no genera resultados de muestra).
+
+> **La base de datos no está en el repositorio.** GitHub guarda solo el código; los sorteos, tickets y saldos viven en el Postgres local de cada instalación. Por eso `npm run dev` genera en cada equipo su propio historial de muestra: los 5 juegos, cada hora de 8 a. m. a 8 p. m., de hoy y los 2 días anteriores, con el RNG provably fair (verificable en Resultados; los números no coinciden entre equipos porque son aleatorios). Solo llena lo que falta. A mano: `npm run simulate:history -w @loteria/api -- 2 --desde 8 --hasta 20`. Desde ahí, los sorteos programados publican su resultado solos (Configuración → *Resultado automático de los sorteos programados*).
 
 ### Paso a paso
 
@@ -75,7 +77,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-Abrir http://localhost:5173. Las cuentas de prueba (jugador con saldo inicial, admin y supervisor de sorteos) están en `apps/api/.env` (`SEED_*`). Para el flujo de 4 ojos: el admin propone el resultado de un sorteo de **La Sabana** y el supervisor lo confirma.
+Abrir http://localhost:5173. Las cuentas de prueba (jugador con saldo inicial, admin y supervisor de sorteos) están en `apps/api/.env` (`SEED_*`). Para el flujo de 4 ojos (con el resultado automático apagado en Configuración): el admin propone el resultado de un sorteo y el supervisor lo confirma.
 
 Para probar un sorteo completo sin esperar al horario: en Backoffice → Sorteos → **+ Sorteo extraordinario** (mín. 6 min).
 
