@@ -1,0 +1,24 @@
+[Unit]
+Description=Loteria Merida API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=loteria
+Group=loteria
+WorkingDirectory=/opt/loteria/app/apps/api
+EnvironmentFile=/etc/loteria.env
+ExecStart=/usr/local/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/loteria
+
+[Install]
+WantedBy=multi-user.target
