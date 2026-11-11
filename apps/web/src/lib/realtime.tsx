@@ -41,6 +41,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const socket = io({
       path: '/api/v1/socket.io',
       transports: ['websocket'],
+      autoConnect: false,
       // Función: en cada reconexión se envía el token vigente.
       auth: (cb) => cb(user ? { token: getAccessToken() } : {}),
     });
@@ -64,7 +65,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     socket.onAny((event: string, data: unknown) => {
       for (const queryKey of EVENT_KEYS[event]?.(data ?? {}) ?? []) qc.invalidateQueries({ queryKey });
     });
+    // StrictMode monta y desmonta el efecto antes de montarlo otra vez en desarrollo.
+    // Esperar un turno evita abrir un WebSocket que se cancela durante el handshake.
+    const connectTimer = setTimeout(() => socket.connect(), 0);
     return () => {
+      clearTimeout(connectTimer);
       socket.close();
     };
   }, [qc, user?.id]);

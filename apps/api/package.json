@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "npm run build -w @loteria/domain",
     "build": "nest build",
+    "predev": "npm run build -w @loteria/domain",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
     "simulate:history": "tsx src/db/simulate-history.ts",
     "simulate:market": "tsx src/db/simulate-market.ts",
+    "pretypecheck": "npm run build -w @loteria/domain",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "historial:exportar": "tsx src/db/history-export.ts",
     "historial:importar": "tsx src/db/history-import.ts"
