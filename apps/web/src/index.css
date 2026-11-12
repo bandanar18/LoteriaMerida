@@ -11,12 +11,163 @@
   --color-oro-400: #f4c94f;
   --color-oro-500: #e8b021;
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Portada de la casa de apuestas: titulares condensados y la firma "Bet". */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+  --font-script: 'Kaushan Script', 'Brush Script MT', cursive;
+  --color-lima-400: #8ee53f;
+  --color-lima-500: #6fd12a;
+  --color-lima-600: #52ad16;
 }
 
 html,
 body,
 #root {
   min-height: 100%;
+}
+
+/* Tinta del texto que va directo sobre el fondo de la página (--ink) y del texto secundario (--muted). */
+:root {
+  --ink: var(--color-selva-900);
+  --muted: rgb(0 0 0 / 0.5);
+}
+/*
+ * Sitio del jugador: fondo oscuro como las casas de apuestas. Las tarjetas y ventanas siguen claras (lectura cómoda)
+ * y recuperan la tinta oscura; lo que va directo sobre el fondo usa tinta blanca.
+ */
+.player-dark {
+  --ink: #fff;
+  --muted: rgb(255 255 255 / 0.6);
+  color: #e9f3ee;
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgb(111 209 42 / 0.08), transparent 60%),
+    radial-gradient(900px 600px at 0% 30%, rgb(27 122 88 / 0.18), transparent 60%),
+    linear-gradient(180deg, #0a2219 0%, #071a12 55%, #06140e 100%);
+  background-attachment: fixed;
+}
+/* Ventanas emergentes: siguen claras, con tinta oscura (en la capa base, así los colores propios de cada pieza mandan). */
+@layer base {
+  .player-dark .surface {
+    --ink: var(--color-selva-900);
+    --muted: rgb(0 0 0 / 0.5);
+    color: #12201a;
+  }
+  .player-dark .surface :is(input, select, textarea) {
+    color: #12201a;
+  }
+}
+/*
+ * Paneles oscuros del jugador. Remapea la paleta clara de las pantallas (blanco, negros translúcidos, verde selva)
+ * a verdes oscuros, sin tocar el código de cada pantalla. Quedan fuera (con su color claro original) las ventanas
+ * emergentes (.surface) y las piezas doradas o de aviso: ficha elegida, franja DEMO, avisos de color, etc.
+ */
+@scope (.player-dark) to (
+    .surface,
+    .btn-gold,
+    .btn-lime,
+    [class~='bg-amber-50'],
+    [class~='bg-amber-100'],
+    [class~='bg-amber-300'],
+    [class~='bg-amber-400'],
+    [class~='bg-amber-300/90'],
+    [class~='bg-oro-300'],
+    [class~='bg-oro-400'],
+    [class~='bg-oro-500'],
+    [class~='bg-oro-300/90'],
+    [class~='bg-emerald-50'],
+    [class~='bg-emerald-100'],
+    [class~='bg-sky-50'],
+    [class~='bg-sky-100'],
+    [class~='bg-red-50'],
+    [class~='bg-red-100'],
+    [class~='bg-orange-100'],
+    [class~='bg-violet-100'],
+    [class~='bg-slate-50'],
+    [class^='from-oro'],
+    [class*=' from-oro'],
+    [class^='from-amber'],
+    [class*=' from-amber'],
+    [class^='from-lima'],
+    [class*=' from-lima'],
+    [class^='from-slate-300'],
+    [class*=' from-slate-300'],
+    [class^='bg-lima'],
+    [class*=' bg-lima']
+  ) {
+  .card {
+    background-color: #0f281d;
+    --tw-ring-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.3);
+    color: #e9f3ee;
+    --ink: #fff;
+    --muted: rgb(255 255 255 / 0.55);
+  }
+  [class~='bg-white'] {
+    background-color: #163a2a;
+  }
+  :is([class~='bg-white/85'], [class~='bg-white/60']) {
+    background-color: rgb(255 255 255 / 0.05);
+  }
+  [class~='bg-white/95'] {
+    background-color: rgb(10 34 25 / 0.95);
+  }
+  :is([class~='bg-black/5'], [class~='bg-black/[0.03]'], [class~='bg-selva-900/[0.02]'], [class~='bg-selva-900/[0.03]'], [class~='bg-selva-900/[0.04]']) {
+    background-color: rgb(255 255 255 / 0.06);
+  }
+  [class~='bg-black/10'] {
+    background-color: rgb(255 255 255 / 0.1);
+  }
+  :is([class~='ring-black/5'], [class~='ring-black/10']) {
+    --tw-ring-color: rgb(255 255 255 / 0.1);
+  }
+  :is([class~='border-black/5'], [class~='border-black/10']) {
+    border-color: rgb(255 255 255 / 0.1);
+  }
+  [class~='divide-black/5'] > :not(:last-child) {
+    border-color: rgb(255 255 255 / 0.08);
+  }
+  :is(.bg-white, .bg-white\/85, input, select, textarea) {
+    color: #e9f3ee;
+  }
+  [class~='text-selva-900'] {
+    color: #f1f8f3;
+  }
+  :is([class~='text-selva-700'], [class~='text-selva-800']) {
+    color: var(--color-lima-400);
+  }
+  :is([class~='text-black/20'], [class~='text-black/30'], [class~='text-black/35']) {
+    color: rgb(255 255 255 / 0.42);
+  }
+  :is([class~='text-black/40'], [class~='text-black/45']) {
+    color: rgb(255 255 255 / 0.45);
+  }
+  :is([class~='text-black/50'], [class~='text-black/55']) {
+    color: rgb(255 255 255 / 0.58);
+  }
+  :is([class~='text-black/60'], [class~='text-black/70']) {
+    color: rgb(255 255 255 / 0.72);
+  }
+  .input {
+    color-scheme: dark;
+    background-color: #0a2016;
+    border-color: rgb(255 255 255 / 0.14);
+    color: #fff;
+  }
+  .label {
+    color: rgb(255 255 255 / 0.7);
+  }
+  .input::placeholder {
+    color: rgb(255 255 255 / 0.4);
+  }
+  .btn-ghost {
+    background: rgb(255 255 255 / 0.1);
+    color: #fff;
+  }
+}
+
+/* Botones secundarios dentro de las ventanas emergentes (claras): vuelven a su estilo claro. */
+.player-dark .surface .btn-ghost {
+  background: rgb(0 0 0 / 0.05);
+  color: var(--color-selva-900);
 }
 
 body {
@@ -38,6 +189,23 @@ body {
 }
 @utility btn-gold {
   @apply btn bg-oro-400 text-selva-950 hover:bg-oro-300;
+}
+/* Botón principal de la portada (verde lima con brillo). */
+@utility btn-lime {
+  @apply btn bg-gradient-to-b from-lima-400 to-lima-600 font-bold text-selva-950 shadow-[0_0_18px_rgba(111,209,42,.4)] hover:brightness-105;
+}
+/* Titulares de la casa de apuestas: condensados, en cursiva y mayúsculas. */
+@utility title-display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+/* Paso numerado (1, 2, 3) delante de cada titular de la pantalla de juego. */
+@utility step-badge {
+  @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-lima-400 to-lima-600 text-lg text-selva-950 not-italic shadow-[0_0_10px_rgba(111,209,42,.35)];
 }
 @utility btn-ghost {
   @apply btn bg-black/5 text-selva-900 hover:bg-black/10;
@@ -97,6 +265,7 @@ body {
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
   color: #0f172a;
+  --ink: var(--color-selva-900);
 }
 .admin-theme .card {
   border-radius: 0.875rem;

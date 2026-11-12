@@ -53,7 +53,7 @@ export function WalletPage() {
           </div>
         ))}
       </div>
-      <div className="flex gap-1 rounded-xl bg-black/5 p-1">
+      <div className="flex gap-1 rounded-xl bg-black/5 p-1 [.player-dark_&]:bg-white/10">
         {(
           [
             ['deposit', 'Depositar'],
@@ -61,7 +61,7 @@ export function WalletPage() {
             ['history', 'Movimientos'],
           ] as const
         ).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${tab === k ? 'bg-white shadow-sm' : 'text-black/60'}`}>
+          <button key={k} onClick={() => setTab(k)} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${tab === k ? 'bg-white text-selva-900 shadow-sm' : 'text-(--muted)'}`}>
             {label}
           </button>
         ))}

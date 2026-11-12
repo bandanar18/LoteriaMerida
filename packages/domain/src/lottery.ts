@@ -236,7 +236,27 @@ export const MERIDA_ANIMALS: ReadonlyArray<{ number: string; name: string; emoji
 ];
 
 /** Modalidades de juego (MER-05 §4). Solo las ACTIVE se venden. */
-export type ModalityCode = 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL';
+export type ModalityCode =
+  | 'EXACT'
+  | 'COMBINADA'
+  | 'MULTIPLE'
+  | 'TERMINAL'
+  | 'LAST_DIGIT'
+  | 'FULL'
+  | 'KINO5'
+  | 'KINO6'
+  | 'KINO7'
+  | 'APPROX'
+  | 'SUPER'
+  | 'DUAL'
+  | 'NUMBER'
+  | 'COLOR'
+  | 'PAIR'
+  | 'MATCH5'
+  | 'MATCH4'
+  | 'MATCH3'
+  | 'REVERSED'
+  | 'PARITY';
 export type ModalityStatus = 'ACTIVE' | 'PENDING_APPROVAL' | 'INACTIVE';
 
 export interface ModalityRule {
@@ -355,7 +375,7 @@ export const TRIPLE_NUMBERS: ReadonlyArray<{ number: string; name: string; emoji
 
 /** Cifras finales que compara cada modalidad: triple exacto 3, terminal 2, última cifra 1. Las demás comparan el símbolo entero. */
 export function matchDigits(code: ModalityCode): number | null {
-  return code === 'TERMINAL' ? 2 : code === 'LAST_DIGIT' || code === 'FULL' ? 1 : null;
+  return code === 'TERMINAL' || code === 'PAIR' ? 2 : code === 'LAST_DIGIT' || code === 'FULL' ? 1 : null;
 }
 
 /**
@@ -363,6 +383,8 @@ export function matchDigits(code: ModalityCode): number | null {
  * Su factor es el del triple; terminal y última cifra pagan 1/10 y 1/100 de él (misma proporción 600 : 60 : 6 del manual).
  */
 export function prizeFactor(code: ModalityCode, played: string, result: string, factorX100: bigint): bigint {
+  // Cóndor Dorado: solo número o solo color.
+  if (code === 'NUMBER' || code === 'COLOR') return playMatches(code, played, result) ? factorX100 : 0n;
   // Terminal Nevado: aproximación gana si el resultado es el número anterior o el siguiente (sin dar la vuelta 99→00).
   if (code === 'APPROX') return Math.abs(Number(played) - Number(result)) === 1 ? factorX100 : 0n;
   // «Las 2» (DUAL): un número juega directo y aproximación; cobra uno solo. El vecino paga 1/5 del directo (proporción 100 : 20 del manual).
@@ -376,6 +398,12 @@ export function prizeFactor(code: ModalityCode, played: string, result: string, 
 
 /** ¿Gana la jugada? Animalitos/Frutas: mismo símbolo. Triple: coinciden las últimas 1, 2 o 3 cifras según la modalidad. */
 export function playMatches(code: ModalityCode, played: string, result: string): boolean {
+  if (code === 'NUMBER') return condorParts(played).number === condorParts(result).number;
+  if (code === 'COLOR') return condorParts(played).color === condorParts(result).color;
+  // Dupleta de Montaña: la invertida gana si sale la pareja al revés.
+  if (code === 'REVERSED') return reversePair(played) === result;
+  // Centena Andina «Par andino»: las dos últimas cifras en cualquier orden (90 gana con …90 y con …09).
+  if (code === 'PAIR') return pairKeys(played).includes(result.slice(-2));
   const k = matchDigits(code);
   return k === null ? played === result : played.slice(-k) === result.slice(-k);
 }
@@ -383,6 +411,11 @@ export function playMatches(code: ModalityCode, played: string, result: string):
 /** Lo que se jugó, tal como lo ve el jugador: «718», terminal «18», última cifra «8». */
 export function playedKey(code: ModalityCode, played: string): string {
   if (code === 'FULL') return played;
+  if (code === 'NUMBER') return condorParts(played).number;
+  if (code === 'COLOR') return condorColor(condorParts(played).color)?.name ?? played;
+  // Cóndor Dorado número + color: «67 Rojo».
+  const condor = condorColor(condorParts(played).color);
+  if (condor && /^\d{2}-/.test(played)) return `${condorParts(played).number} ${condor.name}`;
   const k = matchDigits(code);
   return k === null ? played : played.slice(-k);
 }
@@ -406,6 +439,10 @@ export class TriplePayouts {
       this.last.set(played.slice(-1), (this.last.get(played.slice(-1)) ?? 0n) + l);
       return this;
     }
+    if (code === 'PAIR') {
+      for (const tail of pairKeys(played)) this.terminal.set(tail, (this.terminal.get(tail) ?? 0n) + payout);
+      return this;
+    }
     const k = matchDigits(code);
     const [map, key] = k === 2 ? [this.terminal, played.slice(-2)] : k === 1 ? [this.last, played.slice(-1)] : [this.exact, played];
     map.set(key, (map.get(key) ?? 0n) + payout);
@@ -419,6 +456,7 @@ export class TriplePayouts {
 
   /** Resultados que tocaría una jugada (1, 10 o 100 números). */
   static affected(code: ModalityCode, played: string): string[] {
+    if (code === 'PAIR') return pairKeys(played).flatMap((tail) => TriplePayouts.affected('TERMINAL', tail));
     const k = matchDigits(code) ?? 3;
     const tail = played.slice(-k);
     const span = 10 ** (3 - k);
@@ -437,6 +475,14 @@ export class TriplePayouts {
   }
 }
 
+// ───────────── Cuatrifecta de Cumbres (MER-08): números 0000–9999 ─────────────
+
+/** Catálogo 0000–9999. */
+export const CUATRIFECTA_NUMBERS: ReadonlyArray<{ number: string; name: string; emoji: string }> = Array.from({ length: 10000 }, (_, i) => {
+  const n = String(i).padStart(4, '0');
+  return { number: n, name: n, emoji: '' };
+});
+
 // ───────────── Kino Teleférico (MER-02): elige 5, 6 o 7 números del 01 al 40; se extraen 7 ─────────────
 
 export const KINO_UNIVERSE = 40;
@@ -450,14 +496,28 @@ export const KINO_NUMBERS: ReadonlyArray<{ number: string; name: string; emoji: 
 
 /** Cuántos números lleva cada modalidad Kino (null si no es Kino). */
 export function kinoSize(code: ModalityCode): number | null {
+  if (code === 'MATCH5' || code === 'MATCH4' || code === 'MATCH3') return 5; // Andes 5 Estrella: siempre se eligen 5
   return code === 'KINO5' ? 5 : code === 'KINO6' ? 6 : code === 'KINO7' ? 7 : null;
+}
+
+/** Andes 5 Estrella: cuántos aciertos EXACTOS pide la modalidad (5, 4 o 3). null en Kino, donde deben salir todos. */
+export function pickHits(code: ModalityCode): number | null {
+  return code === 'MATCH5' ? 5 : code === 'MATCH4' ? 4 : code === 'MATCH3' ? 3 : null;
+}
+
+/** ¿Gana la selección? Kino: salen todos los elegidos. Andes 5 Estrella: coinciden exactamente k de los 5. */
+export function pickWins(code: ModalityCode, selection: number[], drawn: number[]): boolean {
+  const k = pickHits(code);
+  if (k === null) return kinoWins(selection, drawn);
+  const set = new Set(drawn);
+  return selection.filter((x) => set.has(x)).length === k;
 }
 
 /** Selección válida: k números distintos entre 1 y 40. Devuelve la selección ordenada o un error legible. */
 export function normalizeKinoSelection(code: ModalityCode, numbers: number[]): { ok: true; selection: number[] } | { ok: false; error: string } {
   const k = kinoSize(code);
   if (k === null) return { ok: false, error: 'La modalidad no es Kino' };
-  if (!Array.isArray(numbers) || numbers.length !== k) return { ok: false, error: `Kino ${k} lleva exactamente ${k} números` };
+  if (!Array.isArray(numbers) || numbers.length !== k) return { ok: false, error: `Esta jugada lleva exactamente ${k} números` };
   if (numbers.some((x) => !Number.isInteger(x) || x < 1 || x > KINO_UNIVERSE)) return { ok: false, error: `Los números van del 01 al ${KINO_UNIVERSE}` };
   const selection = [...numbers].sort((a, b) => a - b);
   if (selection.some((x, i) => i > 0 && x === selection[i - 1])) return { ok: false, error: 'No se pueden repetir números' };
@@ -499,12 +559,16 @@ export const TERMINAL_NUMBERS: ReadonlyArray<{ number: string; name: string; emo
 export class TerminalPayouts {
   private byResult = new Map<string, bigint>();
 
-  /** Resultados con los que paga una jugada (sin circularidad: 00 solo tiene al 01 y 99 solo al 98). */
+  /**
+   * Resultados con los que paga una jugada (sin circularidad: 00 solo tiene al 01 y 99 solo al 98). El ancho sale del número
+   * jugado: sirve para Terminal Nevado (00–99) y Cuatrifecta de Cumbres (0000–9999).
+   */
   static affected(code: ModalityCode, played: string): string[] {
     if (code === 'DUAL') return [played, ...TerminalPayouts.affected('APPROX', played)];
     if (code !== 'APPROX') return [played];
+    const width = played.length;
     const n = Number(played);
-    return [n - 1, n + 1].filter((x) => x >= 0 && x <= 99).map((x) => String(x).padStart(2, '0'));
+    return [n - 1, n + 1].filter((x) => x >= 0 && x < 10 ** width).map((x) => String(x).padStart(width, '0'));
   }
 
   add(code: ModalityCode, played: string, payout: bigint) {
@@ -515,6 +579,150 @@ export class TerminalPayouts {
       return this;
     }
     for (const r of TerminalPayouts.affected(code, played)) this.byResult.set(r, (this.byResult.get(r) ?? 0n) + payout);
+    return this;
+  }
+
+  payout(result: string): bigint {
+    return this.byResult.get(result) ?? 0n;
+  }
+}
+
+// ───────────── Cóndor Dorado (MER-09): número 00–99 × color (rojo, azul, verde, amarillo) ─────────────
+
+export const CONDOR_COLORS = [
+  { code: 'ROJO', name: 'Rojo', emoji: '🔴' },
+  { code: 'AZUL', name: 'Azul', emoji: '🔵' },
+  { code: 'VERDE', name: 'Verde', emoji: '🟢' },
+  { code: 'AMARILLO', name: 'Amarillo', emoji: '🟡' },
+] as const;
+export type CondorColor = (typeof CONDOR_COLORS)[number]['code'];
+
+export const condorColor = (code: string) => CONDOR_COLORS.find((c) => c.code === code);
+
+/** «67-ROJO» → { number: '67', color: 'ROJO' }. */
+export function condorParts(symbol: string): { number: string; color: string } {
+  const [number = '', color = ''] = symbol.split('-');
+  return { number, color };
+}
+
+/**
+ * Catálogo de 400 resultados: cada símbolo es un número y un color («67-ROJO»). El RNG elige uno de los 400 con la misma
+ * probabilidad, así número (1/100) y color (1/4) salen independientes.
+ */
+export const CONDOR_SYMBOLS: ReadonlyArray<{ number: string; name: string; emoji: string }> = Array.from({ length: 400 }, (_, i) => {
+  const n = String(Math.floor(i / 4)).padStart(2, '0');
+  const c = CONDOR_COLORS[i % 4];
+  return { number: `${n}-${c.code}`, name: `${n} ${c.name}`, emoji: '' };
+});
+
+/**
+ * Pasivo por resultado en Cóndor Dorado: número + color paga con 1 resultado, solo número con 4 (sus cuatro colores)
+ * y solo color con 100 (todos los números de ese color).
+ */
+export class ColorPayouts {
+  private byResult = new Map<string, bigint>();
+
+  static affected(code: ModalityCode, played: string): string[] {
+    const { number, color } = condorParts(played);
+    if (code === 'NUMBER') return CONDOR_COLORS.map((c) => `${number}-${c.code}`);
+    if (code === 'COLOR') return Array.from({ length: 100 }, (_, i) => `${String(i).padStart(2, '0')}-${color}`);
+    return [played];
+  }
+
+  add(code: ModalityCode, played: string, payout: bigint) {
+    for (const r of ColorPayouts.affected(code, played)) this.byResult.set(r, (this.byResult.get(r) ?? 0n) + payout);
+    return this;
+  }
+
+  payout(result: string): bigint {
+    return this.byResult.get(result) ?? 0n;
+  }
+}
+
+// ───────────── Juegos con tope de pago por resultado (Triple, Terminal, Cóndor) ─────────────
+
+/** Tableros donde una jugada puede pagar con varios resultados: el tope se controla resultado por resultado. */
+export function isResultBoard(board: string): board is 'DIGITS3' | 'DIGITS2' | 'DIGITS4' | 'COLOR' | 'DUO' {
+  return board === 'DIGITS3' || board === 'DIGITS2' || board === 'DIGITS4' || board === 'COLOR' || board === 'DUO';
+}
+
+/** Acumulador de premios por resultado del tablero. */
+export function newResultPayouts(board: string): { add(code: ModalityCode, played: string, payout: bigint): unknown; payout(result: string): bigint } {
+  if (board === 'DUO') return new DupletaPayouts();
+  return board === 'COLOR' ? new ColorPayouts() : board === 'DIGITS2' || board === 'DIGITS4' ? new TerminalPayouts() : new TriplePayouts();
+}
+
+/** Resultados con los que pagaría una jugada. */
+export function affectedResults(board: string, code: ModalityCode, played: string): string[] {
+  if (board === 'DUO') return DupletaPayouts.affected(code, played);
+  return board === 'COLOR' ? ColorPayouts.affected(code, played) : board === 'DIGITS2' || board === 'DIGITS4' ? TerminalPayouts.affected(code, played) : TriplePayouts.affected(code, played);
+}
+
+/** Todos los resultados posibles del tablero, en orden. */
+export function allResults(board: string): string[] {
+  if (board === 'COLOR') return CONDOR_SYMBOLS.map((s) => s.number);
+  if (board === 'DUO') return DUPLETA_SYMBOLS.map((s) => s.number);
+  const width = board === 'DIGITS2' ? 2 : board === 'DIGITS4' ? 4 : 3;
+  return Array.from({ length: 10 ** width }, (_, i) => String(i).padStart(width, '0'));
+}
+
+/** Finales de dos cifras con los que gana un «Par andino»: «90» → [«90», «09»]; un par doble («77») tiene uno solo. */
+export function pairKeys(played: string): string[] {
+  const t = played.slice(-2);
+  const r = t[1] + t[0];
+  return r === t ? [t] : [t, r];
+}
+
+/**
+ * Probabilidad de ganar una jugada de números 01–n cuando se extraen `drawn` (hipergeométrica).
+ * Kino k: salen los k elegidos. Andes 5 Estrella: exactamente h aciertos entre los 5 elegidos.
+ */
+export function pickWinProbability(code: ModalityCode, drawn: number, n = KINO_UNIVERSE): number {
+  const k = kinoSize(code);
+  if (k === null) return 0;
+  const h = pickHits(code) ?? k;
+  return (choose(k, h) * choose(n - k, drawn - h)) / choose(n, drawn);
+}
+
+/** Cuántas selecciones distintas pueden ganar a la vez en un sorteo (acota el peor resultado). */
+export function pickMaxWinners(code: ModalityCode, drawn: number, n = KINO_UNIVERSE): number {
+  const k = kinoSize(code);
+  if (k === null) return 0;
+  const h = pickHits(code) ?? k;
+  return choose(drawn, h) * choose(n - drawn, k - h);
+}
+
+// ───────────── Dupleta de Montaña (MER-07): pareja ordenada de dos números distintos del 00 al 99 ─────────────
+
+/** Catálogo de 9.900 resultados: «25-52» (primero 25, luego 52). No hay parejas repetidas (manual MER-07, Anexo B.1). */
+export const DUPLETA_SYMBOLS: ReadonlyArray<{ number: string; name: string; emoji: string }> = (() => {
+  const out: { number: string; name: string; emoji: string }[] = [];
+  for (let a = 0; a < 100; a++) {
+    for (let b = 0; b < 100; b++) {
+      if (a === b) continue;
+      const n = `${String(a).padStart(2, '0')}-${String(b).padStart(2, '0')}`;
+      out.push({ number: n, name: n, emoji: '' });
+    }
+  }
+  return out;
+})();
+
+/** «25-52» → «52-25». */
+export function reversePair(played: string): string {
+  const [a, b] = played.split('-');
+  return `${b}-${a}`;
+}
+
+/** Pasivo por resultado en Dupleta: la exacta paga con su pareja y la invertida con la pareja al revés. */
+export class DupletaPayouts {
+  private byResult = new Map<string, bigint>();
+
+  static affected(code: ModalityCode, played: string): string[] {
+    return code === 'REVERSED' ? [reversePair(played)] : [played];
+  }
+
+  add(code: ModalityCode, played: string, payout: bigint) {
+    for (const r of DupletaPayouts.affected(code, played)) this.byResult.set(r, (this.byResult.get(r) ?? 0n) + payout);
     return this;
   }
 

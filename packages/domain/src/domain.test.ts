@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkModality,
+  DUPLETA_SYMBOLS,
+  DupletaPayouts,
+  CUATRIFECTA_NUMBERS,
+  pickWins,
+  pickWinProbability,
+  pickMaxWinners,
+  pairKeys,
+  CONDOR_SYMBOLS,
+  ColorPayouts,
+  affectedResults,
+  allResults,
   MERIDA_ANIMALS,
   PARAMO_FRUITS,
   TerminalPayouts,
@@ -408,5 +419,118 @@ describe('Terminal Nevado · Las 2 (DUAL)', () => {
     expect(p.payout('18')).toBe(50000n);
     expect(p.payout('19')).toBe(10000n);
     expect(TerminalPayouts.affected('DUAL', '18')).toEqual(['18', '17', '19']);
+  });
+});
+
+describe('Cóndor Dorado (MER-09)', () => {
+  it('400 resultados únicos: 100 números × 4 colores', () => {
+    expect(CONDOR_SYMBOLS).toHaveLength(400);
+    expect(new Set(CONDOR_SYMBOLS.map((s) => s.number)).size).toBe(400);
+    expect(CONDOR_SYMBOLS[268]).toEqual({ number: '67-ROJO', name: '67 Rojo', emoji: '' });
+    expect(allResults('COLOR')).toHaveLength(400);
+  });
+
+  it('cada modalidad gana solo con su condición', () => {
+    expect(prizeFactor('EXACT', '67-ROJO', '67-ROJO', 50000n)).toBe(50000n);
+    expect(prizeFactor('EXACT', '67-ROJO', '67-AZUL', 50000n)).toBe(0n);
+    expect(prizeFactor('NUMBER', '67-ROJO', '67-VERDE', 5000n)).toBe(5000n);
+    expect(prizeFactor('NUMBER', '67-ROJO', '68-ROJO', 5000n)).toBe(0n);
+    expect(prizeFactor('COLOR', '00-ROJO', '67-ROJO', 500n)).toBe(500n);
+    expect(prizeFactor('COLOR', '00-ROJO', '67-AZUL', 500n)).toBe(0n);
+    expect(playedKey('NUMBER', '67-ROJO')).toBe('67');
+    expect(playedKey('COLOR', '00-AMARILLO')).toBe('Amarillo');
+  });
+
+  it('el pasivo por resultado suma las tres modalidades', () => {
+    expect(ColorPayouts.affected('NUMBER', '67-ROJO')).toEqual(['67-ROJO', '67-AZUL', '67-VERDE', '67-AMARILLO']);
+    expect(affectedResults('COLOR', 'COLOR', '00-VERDE')).toHaveLength(100);
+    const p = new ColorPayouts().add('EXACT', '67-ROJO', 5000n).add('NUMBER', '67-ROJO', 500n).add('COLOR', '00-ROJO', 50n);
+    expect(p.payout('67-ROJO')).toBe(5550n);
+    expect(p.payout('67-AZUL')).toBe(500n);
+    expect(p.payout('12-ROJO')).toBe(50n);
+    expect(p.payout('12-AZUL')).toBe(0n);
+  });
+
+  it('RTP del manual: número + color y solo color devuelven 125 %, solo número 50 %', () => {
+    expect(rtpBps(50000n, 1n, 400n)).toBe(12500n);
+    expect(rtpBps(5000n, 4n, 400n)).toBe(5000n);
+    expect(rtpBps(500n, 100n, 400n)).toBe(12500n);
+  });
+});
+
+describe('Centena Andina (MER-06)', () => {
+  it('Aproximación = las dos últimas cifras en orden; Par andino = en cualquier orden', () => {
+    expect(prizeFactor('EXACT', '009', '009', 20000n)).toBe(20000n);
+    expect(prizeFactor('TERMINAL', '009', '209', 4000n)).toBe(4000n);
+    expect(prizeFactor('TERMINAL', '009', '290', 4000n)).toBe(0n);
+    expect(prizeFactor('PAIR', '090', '509', 2000n)).toBe(2000n);
+    expect(prizeFactor('PAIR', '090', '590', 2000n)).toBe(2000n);
+    expect(prizeFactor('PAIR', '090', '599', 2000n)).toBe(0n);
+    expect(pairKeys('477')).toEqual(['77']);
+    expect(playedKey('PAIR', '090')).toBe('90');
+  });
+
+  it('Par andino toca 20 resultados (10 si las cifras son iguales) y suma en el pasivo', () => {
+    expect(TriplePayouts.affected('PAIR', '090')).toHaveLength(20);
+    expect(TriplePayouts.affected('PAIR', '077')).toHaveLength(10);
+    const p = new TriplePayouts().add('PAIR', '090', 200n).add('EXACT', '009', 2000n);
+    expect(p.payout('009')).toBe(2200n);
+    expect(p.payout('190')).toBe(200n);
+    expect(p.payout('199')).toBe(0n);
+  });
+});
+
+describe('Andes 5 Estrella (MER-10)', () => {
+  const drawn = [3, 12, 21, 34, 40];
+  it('5 exactos, 4 aciertos y 3 aciertos piden exactamente esa cantidad', () => {
+    expect(pickWins('MATCH5', [3, 12, 21, 34, 40], drawn)).toBe(true);
+    expect(pickWins('MATCH4', [3, 12, 21, 34, 40], drawn)).toBe(false);
+    expect(pickWins('MATCH4', [3, 12, 21, 34, 38], drawn)).toBe(true);
+    expect(pickWins('MATCH3', [3, 12, 21, 7, 29], drawn)).toBe(true);
+    expect(pickWins('MATCH3', [3, 12, 21, 34, 29], drawn)).toBe(false);
+    expect(pickWins('KINO5', [3, 12, 21, 34, 40], [...drawn, 1, 2])).toBe(true);
+  });
+  it('probabilidades exactas sobre C(40,5) = 658.008', () => {
+    expect(pickWinProbability('MATCH5', 5) * 658008).toBeCloseTo(1);
+    expect(pickWinProbability('MATCH4', 5) * 658008).toBeCloseTo(175);
+    expect(pickWinProbability('MATCH3', 5) * 658008).toBeCloseTo(5950);
+    expect(pickWinProbability('KINO5', 7)).toBeCloseTo(kinoWinProbability(5));
+    expect(pickMaxWinners('MATCH4', 5)).toBe(175);
+    expect(pickMaxWinners('KINO5', 7)).toBe(21);
+  });
+});
+
+describe('Cuatrifecta de Cumbres (MER-08)', () => {
+  it('10.000 resultados de 0000 a 9999', () => {
+    expect(CUATRIFECTA_NUMBERS).toHaveLength(10000);
+    expect(CUATRIFECTA_NUMBERS[1234].number).toBe('1234');
+    expect(allResults('DIGITS4')).toHaveLength(10000);
+  });
+  it('exacta y aproximación (vecinos de 4 cifras, sin dar la vuelta)', () => {
+    expect(prizeFactor('EXACT', '1234', '1234', 200000n)).toBe(200000n);
+    expect(prizeFactor('EXACT', '1234', '1235', 200000n)).toBe(0n);
+    expect(prizeFactor('APPROX', '1234', '1233', 10000n)).toBe(10000n);
+    expect(prizeFactor('APPROX', '1234', '1236', 10000n)).toBe(0n);
+    expect(affectedResults('DIGITS4', 'APPROX', '1234')).toEqual(['1233', '1235']);
+    expect(affectedResults('DIGITS4', 'APPROX', '0000')).toEqual(['0001']);
+    expect(affectedResults('DIGITS4', 'APPROX', '9999')).toEqual(['9998']);
+    expect(affectedResults('DIGITS2', 'APPROX', '99')).toEqual(['98']);
+  });
+});
+
+describe('Dupleta de Montaña (MER-07)', () => {
+  it('9.900 parejas ordenadas de números distintos', () => {
+    expect(DUPLETA_SYMBOLS).toHaveLength(9900);
+    expect(DUPLETA_SYMBOLS.some((s) => s.number === '25-25')).toBe(false);
+    expect(allResults('DUO')).toHaveLength(9900);
+  });
+  it('exacta gana con 25-52; invertida con 52-25', () => {
+    expect(prizeFactor('EXACT', '25-52', '25-52', 15000n)).toBe(15000n);
+    expect(prizeFactor('EXACT', '25-52', '52-25', 15000n)).toBe(0n);
+    expect(prizeFactor('REVERSED', '25-52', '52-25', 7500n)).toBe(7500n);
+    expect(prizeFactor('REVERSED', '25-52', '25-52', 7500n)).toBe(0n);
+    const p = new DupletaPayouts().add('EXACT', '25-52', 1500n).add('REVERSED', '52-25', 750n);
+    expect(p.payout('25-52')).toBe(2250n);
+    expect(affectedResults('DUO', 'REVERSED', '25-52')).toEqual(['52-25']);
   });
 });

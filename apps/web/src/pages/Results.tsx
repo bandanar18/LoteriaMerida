@@ -47,7 +47,7 @@ export function ResultsPage() {
 
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-selva-900">Otra fecha</h2>
+          <h2 className="font-semibold text-(--ink)">Otra fecha</h2>
           <div className="flex items-center gap-1">
             <button className="btn-ghost px-3" aria-label="Día anterior" onClick={() => setOtherDate(shiftDate(otherDate, -1))}>
               ‹
@@ -70,13 +70,20 @@ export function ResultsPage() {
             </button>
           </div>
         </div>
-        <p className="mb-2 text-xs text-black/50 first-letter:uppercase">{longDate(otherDate)}</p>
+        <p className="mb-2 text-xs text-(--muted) first-letter:uppercase">{longDate(otherDate)}</p>
         {other.isLoading ? <Spinner /> : !other.data?.length ? <Empty>No hay sorteos para esta fecha.</Empty> : <DayGrid draws={other.data} onVerify={setVerifyId} />}
       </section>
 
-      <p className="text-xs text-black/40">
-        Toca un resultado para verificarlo. Los resultados anteriores no influyen en los sorteos futuros: {symbolWords(game).every} tiene siempre {game.draw_count > 1 ? game.draw_count : 1} en{' '}
-        {game.symbols.length} de probabilidad{game.draw_count > 1 ? ` (salen ${game.draw_count} por sorteo)` : ''}.
+      <p className="text-xs text-(--muted)">
+        Toca un resultado para verificarlo. Los resultados anteriores no influyen en los sorteos futuros:{' '}
+        {game.board === 'COLOR' ? (
+          <>cada número con su color tiene siempre 1 en 400 de probabilidad; un número, 1 en 100; un color, 1 en 4.</>
+        ) : (
+          <>
+            {symbolWords(game).every} tiene siempre {game.draw_count > 1 ? game.draw_count : 1} en {game.symbol_count ?? game.symbols.length} de probabilidad
+            {game.draw_count > 1 ? ` (salen ${game.draw_count} por sorteo)` : ''}.
+          </>
+        )}
       </p>
       <Modal open={!!verifyId} onClose={() => setVerifyId(null)} title="Verificación del sorteo">
         {verifyId && <Verify drawId={verifyId} />}
@@ -99,11 +106,11 @@ function Day(props: {
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-selva-900">
-          {props.title} <span className="text-sm font-normal text-black/50">· {longDate(props.date)}</span>
+        <h2 className="font-semibold text-(--ink)">
+          {props.title} <span className="text-sm font-normal text-(--muted)">· {longDate(props.date)}</span>
         </h2>
         {draws.length > 0 && (
-          <span className="shrink-0 text-xs text-black/45 tabular-nums">
+          <span className="shrink-0 text-xs text-(--muted) tabular-nums">
             {done}/{draws.length} sorteos
           </span>
         )}

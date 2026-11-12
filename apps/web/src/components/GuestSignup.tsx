@@ -23,11 +23,16 @@ export function GuestWelcome() {
   const { agentName } = useStoredReferral();
   if (!balance) return null;
   return (
-    <div className="card overflow-hidden">
-      <div className="bg-gradient-to-r from-oro-400 to-amber-400 px-4 py-3 text-selva-950">
-        {agentName && <p className="text-xs font-bold uppercase tracking-wide">Te invitó: {agentName}</p>}
-        <p className="text-lg font-extrabold leading-tight">🎁 Tienes {money(balance.VES, 'VES')} y {money(balance.USDT, 'USDT')} para jugar</p>
-        <p className="text-xs font-medium text-selva-950/75">Arma tu jugada; al comprar solo te pedimos 4 datos. Saldo DEMO, sin valor real.</p>
+    <div className="card overflow-hidden ring-2 ring-amber-400/60">
+      <div className="flex items-center gap-4 bg-gradient-to-r from-oro-400 via-amber-400 to-oro-400 px-5 py-4 text-selva-950 sm:px-7 sm:py-5">
+        <span className="text-4xl sm:text-5xl" aria-hidden="true">🎁</span>
+        <div className="min-w-0">
+          {agentName && <p className="text-xs font-bold uppercase tracking-wide">Te invitó: {agentName}</p>}
+          <p className="title-display text-2xl sm:text-3xl">
+            Tienes {money(balance.VES, 'VES')} y {money(balance.USDT, 'USDT')} para jugar
+          </p>
+          <p className="mt-1 text-sm font-medium text-selva-950/75">Arma tu jugada; al comprar solo te pedimos 4 datos. Saldo DEMO, sin valor real.</p>
+        </div>
       </div>
     </div>
   );

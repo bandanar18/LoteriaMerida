@@ -25,7 +25,7 @@ export class PlayDto {
   @ValidateIf((p) => !p.numbers) @IsUUID() symbolId?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsInt({ each: true }) @Min(1, { each: true }) @Max(99, { each: true }) numbers?: number[];
   @Matches(/^\d{1,15}([.,]\d{1,6})?$/, { message: 'Monto inválido' }) amount: string;
-  @IsOptional() @IsIn(['EXACT', 'COMBINADA', 'MULTIPLE', 'TERMINAL', 'LAST_DIGIT', 'FULL', 'KINO5', 'KINO6', 'KINO7', 'APPROX', 'SUPER', 'DUAL']) modality?: ModalityCode;
+  @IsOptional() @IsIn(['EXACT', 'COMBINADA', 'MULTIPLE', 'TERMINAL', 'LAST_DIGIT', 'FULL', 'KINO5', 'KINO6', 'KINO7', 'APPROX', 'SUPER', 'DUAL', 'NUMBER', 'COLOR', 'PAIR', 'MATCH5', 'MATCH4', 'MATCH3', 'REVERSED', 'PARITY']) modality?: ModalityCode;
 }
 
 export class BuyTicketDto {

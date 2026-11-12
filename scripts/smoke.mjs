@@ -60,7 +60,7 @@ const trader = await login(env.SEED_TRADER_EMAIL, env.SEED_TRADER_PASSWORD);
 ok(player && admin && supervisor && compliance && trader, 'login de jugador, admin, supervisor, cumplimiento y trader');
 
 const games = (await call('GET', '/lottery/games')).data;
-ok(games.map((g) => g.code).join(',') === 'MER-05,MER-03,MER-01,MER-02,MER-04', 'cinco juegos activos: Animalitos, Frutas, Triple Andino, Kino Teleférico y Terminal Nevado');
+ok(games.map((g) => g.code).join(',') === 'MER-05,MER-03,MER-01,MER-02,MER-04,MER-09,MER-06,MER-10,MER-08,MER-07', 'diez juegos activos (MER-01 a MER-10, sin el 06 de Futuros)');
 const merida = games.find((g) => g.code === 'MER-05');
 ok(
   merida?.symbols.length === 70 &&

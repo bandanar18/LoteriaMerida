@@ -1,7 +1,7 @@
 /// <reference types="multer" />
 import { Body, Controller, Get, Header, HttpCode, Param, ParseBoolPipe, ParseUUIDPipe, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { KYC_MAX_FILE_BYTES } from '@loteria/domain';
+import { isResultBoard, KYC_MAX_FILE_BYTES } from '@loteria/domain';
 import type { Response } from 'express';
 import { AvailabilityDto } from '../common/availability.dto';
 import { DbService } from '../common/db.service';
@@ -222,7 +222,7 @@ export class LotteryAdminController {
         d.max_risk_pct = r?.pct ?? 0;
       }
     }
-    if (g?.board === 'DIGITS3' || g?.board === 'DIGITS2') {
+    if (g && isResultBoard(g.board)) {
       const limits = await this.db.query(`SELECT currency, max_liability_per_symbol::text AS cap FROM lottery.game_limit WHERE game_id = $1`, [gameId]);
       for (const d of rows) {
         let use = 0;
@@ -266,7 +266,7 @@ export class LotteryAdminController {
       );
       return { draw, rows };
     }
-    if (draw?.board === 'DIGITS3' || draw?.board === 'DIGITS2') {
+    if (draw && isResultBoard(draw.board)) {
       // Triple: pasivo por resultado (triple + terminal + última cifra). Se listan los 100 números más cargados por moneda.
       const limits = await this.db.query(`SELECT currency, max_liability_per_symbol::text AS cap FROM lottery.game_limit WHERE game_id = $1`, [draw.game_id]);
       const rows = [];

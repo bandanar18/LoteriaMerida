@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { kinoSubsetsPerDraw, kinoWinProbability, ModalityCode, TerminalPayouts, TriplePayouts } from '@loteria/domain';
+import { allResults, CONDOR_SYMBOLS, isResultBoard, ModalityCode, pickMaxWinners, pickWinProbability, newResultPayouts } from '@loteria/domain';
 import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
 import { localDate } from '../common/time';
@@ -18,23 +18,25 @@ import { localDate } from '../common/time';
  * su media y varianza; P(pérdida del día) se aproxima con una normal.
  * Montos en unidades mínimas (BIGINT); la varianza y las probabilidades se calculan en coma flotante (solo informativas).
  */
+/** Nombres de los 400 resultados de Cóndor Dorado («67 Rojo»). */
+const CONDOR_NAME = new Map(CONDOR_SYMBOLS.map((s) => [s.number, s.name]));
+
 type PlayAgg = { number: string; name: string; emoji: string | null; code: ModalityCode; sold: string; payout: string };
 
 /** Pago total por cada resultado posible con premio > 0 (los resultados sin jugadas pagan 0). */
 export function resultPayouts(ps: PlayAgg[], board: string) {
   const out = new Map<string, { number: string; name: string; emoji: string | null; sold: bigint; payout: bigint }>();
-  if (board === 'DIGITS3' || board === 'DIGITS2') {
-    const width = board === 'DIGITS2' ? 2 : 3;
-    const tp = board === 'DIGITS2' ? new TerminalPayouts() : new TriplePayouts();
+  if (isResultBoard(board)) {
+    const tp = newResultPayouts(board);
+    const names = new Map(ps.map((p) => [p.number, p]));
     const stake = new Map<string, bigint>();
     for (const p of ps) {
       tp.add(p.code, p.number, BigInt(p.payout));
       stake.set(p.number, (stake.get(p.number) ?? 0n) + BigInt(p.sold));
     }
-    for (let i = 0; i < 10 ** width; i++) {
-      const r = String(i).padStart(width, '0');
+    for (const r of allResults(board)) {
       const payout = tp.payout(r);
-      if (payout > 0n) out.set(r, { number: r, name: r, emoji: null, sold: stake.get(r) ?? 0n, payout });
+      if (payout > 0n) out.set(r, { number: r, name: CONDOR_NAME.get(r) ?? names.get(r)?.name ?? r, emoji: null, sold: stake.get(r) ?? 0n, payout });
     }
     return [...out.values()];
   }
@@ -54,8 +56,9 @@ export class RiskService {
   async day(gameId: string, currency: string, date?: string) {
     const day = date ?? localDate();
     const game = await this.db.one(
-      `SELECT g.id, g.code, g.name, g.timezone, g.board, (SELECT count(*)::int FROM lottery.symbol s WHERE s.game_id = g.id) AS n,
-              (SELECT m.factor_x100 FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5') ORDER BY m.code = 'EXACT' DESC LIMIT 1)::text AS factor_x100,
+      `SELECT g.id, g.code, g.name, g.timezone, g.board, g.draw_count, (SELECT count(*)::int FROM lottery.symbol s WHERE s.game_id = g.id) AS n,
+              (SELECT m.factor_x100 FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5', 'MATCH5') ORDER BY m.code = 'EXACT' DESC LIMIT 1)::text AS factor_x100,
+              (SELECT m.code FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5', 'MATCH5') ORDER BY m.code = 'EXACT' DESC LIMIT 1) AS factor_code,
               l.max_liability_per_symbol::text AS cap, l.max_player_per_draw::text AS player_cap
          FROM lottery.game g JOIN lottery.game_limit l ON l.game_id = g.id AND l.currency = $2 WHERE g.id = $1`,
       [gameId, currency],
@@ -100,21 +103,24 @@ export class RiskService {
       let lossProbability: number;
       let top: { number: string; name: string; emoji: string | null; sold: bigint; payout: bigint }[];
       if (game.board === 'KINO') {
-        // Kino: cada combinación gana con probabilidad C(40−k, 7−k)/C(40, 7). El peor caso es una cota: en 7 extraídos caben
-        // a lo sumo C(7, k) combinaciones de k, así que se suman las C(7, k) más cargadas de cada tamaño.
+        // Números 01–40 (Kino y Andes 5 Estrella): cada línea gana con su probabilidad hipergeométrica. El peor caso es una cota:
+        // por modalidad caben a lo sumo pickMaxWinners ganadoras en un sorteo, así que se suman las más cargadas de cada una.
         const lines = ps.map((p: any) => ({
-          k: p.selection.length as number,
+          code: p.code as ModalityCode,
+          p: pickWinProbability(p.code, game.draw_count),
           number: p.selection.map((x: number) => String(x).padStart(2, '0')).join('-'),
           name: p.modality_name as string,
           emoji: null,
           sold: BigInt(p.sold),
           payout: BigInt(p.payout),
         }));
-        expectedPayout = lines.reduce((a, l) => a + Number(l.payout) * kinoWinProbability(l.k), 0);
-        variance = lines.reduce((a, l) => a + Number(l.payout) ** 2 * kinoWinProbability(l.k) * (1 - kinoWinProbability(l.k)), 0);
-        lossProbability = Math.min(1, lines.filter((l) => l.payout > sold).reduce((a, l) => a + kinoWinProbability(l.k), 0));
-        maxPay = [5, 6, 7].reduce(
-          (acc, k) => acc + lines.filter((l) => l.k === k).map((l) => l.payout).sort((a, b) => Number(b - a)).slice(0, kinoSubsetsPerDraw(k)).reduce((a, x) => a + x, 0n),
+        expectedPayout = lines.reduce((a, l) => a + Number(l.payout) * l.p, 0);
+        variance = lines.reduce((a, l) => a + Number(l.payout) ** 2 * l.p * (1 - l.p), 0);
+        lossProbability = Math.min(1, lines.filter((l) => l.payout > sold).reduce((a, l) => a + l.p, 0));
+        maxPay = [...new Set(lines.map((l) => l.code))].reduce(
+          (acc, code) =>
+            acc +
+            lines.filter((l) => l.code === code).map((l) => l.payout).sort((a, b) => Number(b - a)).slice(0, pickMaxWinners(code, game.draw_count)).reduce((a, x) => a + x, 0n),
           0n,
         );
         bestPay = 0n;
@@ -190,8 +196,8 @@ export class RiskService {
       date: day,
       model: {
         // Kino: retorno de Kino 5 (la modalidad más jugable).
-        rtp: (Number(game.factor_x100) / 100) * (game.board === 'KINO' ? kinoWinProbability(5) : 1 / n),
-        house_edge: 1 - (Number(game.factor_x100) / 100) * (game.board === 'KINO' ? kinoWinProbability(5) : 1 / n),
+        rtp: (Number(game.factor_x100) / 100) * (game.board === 'KINO' ? pickWinProbability(game.factor_code, game.draw_count) : 1 / n),
+        house_edge: 1 - (Number(game.factor_x100) / 100) * (game.board === 'KINO' ? pickWinProbability(game.factor_code, game.draw_count) : 1 / n),
       },
       summary: {
         sold: soldDay.toString(),

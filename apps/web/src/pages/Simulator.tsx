@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { ErrorBox, Modal, Notice, Spinner } from '../components/ui';
 import { post } from '../lib/api';
 import { Currency, money } from '../lib/format';
-import { Draw, Game, useBalances, useGames, useSimulationStatus } from '../lib/queries';
+import { Draw, Game, useBalances, useGames, useGameSymbols, useSimulationStatus } from '../lib/queries';
 import { GameBoard } from './Play';
 import { NumberBalls, SymbolArt, symbolName } from '../components/SymbolArt';
 import { playedLabel } from '../lib/queries';
@@ -122,6 +122,7 @@ function Topup() {
 
 function SimGame({ game }: { game: Game }) {
   const qc = useQueryClient();
+  const symbols = useGameSymbols(game);
   const drawQ = useQuery({
     queryKey: ['sim-draw', game.id],
     queryFn: () => post<Draw>(`/simulation/games/${game.id}/draw`),
@@ -192,7 +193,7 @@ function SimGame({ game }: { game: Game }) {
       />
 
       <Modal open={rolling || !!result} onClose={() => (rolling ? undefined : playAgain())} title={rolling ? 'Sorteando…' : 'Resultado'}>
-        {rolling ? <Rolling symbols={game.symbols.map((s) => s.emoji || s.number)} /> : result && <ResultView r={result} onAgain={playAgain} />}
+        {rolling ? <Rolling symbols={symbols.map((s) => s.emoji || s.number)} /> : result && <ResultView r={result} onAgain={playAgain} />}
       </Modal>
     </>
   );

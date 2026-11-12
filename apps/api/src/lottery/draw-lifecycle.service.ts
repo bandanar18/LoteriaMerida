@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import { aggregateTicketStatus, applyMultiplier, assertTransition, CurrencyCode, DrawStatus, KYC_MAX_FILE_BYTES, kinoWins, prizeFactor, PlayStatus, sniffMime } from '@loteria/domain';
+import { aggregateTicketStatus, applyMultiplier, assertTransition, CurrencyCode, DrawStatus, KYC_MAX_FILE_BYTES, pickWins, prizeFactor, PlayStatus, sniffMime } from '@loteria/domain';
 import { AuditService } from '../audit/audit.service';
 import { Db, DbService } from '../common/db.service';
 import { BusinessError, pgErrorCode } from '../common/errors';
@@ -380,7 +380,7 @@ export class DrawLifecycleService {
         // Animalitos/Frutas: mismo símbolo. Triple: coinciden 3, 2 o 1 cifras finales según la modalidad.
         // Kino: gana si todos sus números están entre los extraídos.
         const f = p.selection
-          ? kinoWins(p.selection, d.result_numbers ?? []) ? BigInt(p.factor_x100) : 0n
+          ? pickWins(p.modality, p.selection, d.result_numbers ?? []) ? BigInt(p.factor_x100) : 0n
           : prizeFactor(p.modality, p.number, resultNumber, BigInt(p.factor_x100));
         const won = f > 0n;
         const win = won ? applyMultiplier(amount, f) : 0n;

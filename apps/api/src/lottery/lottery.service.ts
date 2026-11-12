@@ -3,8 +3,10 @@ import {
   fairSample,
   kinoSize,
   normalizeKinoSelection,
-  TriplePayouts,
-  TerminalPayouts,
+  affectedResults,
+  allResults,
+  isResultBoard,
+  newResultPayouts,
   playedKey,
   applyMultiplier,
   checkModality,
@@ -71,6 +73,9 @@ function playErrorMessage(e: PlayValidationError): string {
   }
 }
 
+/** Por encima de esta cantidad de símbolos, la lista de juegos no incluye el catálogo (se pide con GET games/:id/symbols). */
+const LAZY_SYMBOLS = 2000;
+
 @Injectable()
 export class LotteryService {
   constructor(
@@ -81,6 +86,11 @@ export class LotteryService {
   ) {}
 
   // ───────────── Lectura pública ─────────────
+
+  /** Catálogo completo de un juego, en orden. */
+  gameSymbols(gameId: string) {
+    return this.db.query(`SELECT id, number, name, emoji, sort FROM lottery.symbol WHERE game_id = $1 ORDER BY sort`, [gameId]);
+  }
 
   async listGames(includeInactive = false) {
     const games = await this.db.query(
@@ -95,7 +105,9 @@ export class LotteryService {
            FROM lottery.modality WHERE game_id = $1 AND status <> 'INACTIVE' ORDER BY sort`,
         [g.id],
       );
-      g.symbols = await this.db.query(`SELECT id, number, name, emoji, sort FROM lottery.symbol WHERE game_id = $1 ORDER BY sort`, [g.id]);
+      // Tableros grandes (Cuatrifecta: 10.000 números) no viajan en la lista: se piden aparte al abrir el juego.
+      g.symbol_count = (await this.db.one(`SELECT count(*)::int AS n FROM lottery.symbol WHERE game_id = $1`, [g.id])).n;
+      g.symbols = g.symbol_count > LAZY_SYMBOLS ? [] : await this.gameSymbols(g.id);
       g.limits = await this.db.query(
         `SELECT currency, min_play::text, max_play::text, max_ticket::text, max_liability_per_symbol::text, max_player_per_draw::text
            FROM lottery.game_limit WHERE game_id = $1 ORDER BY currency`,
@@ -124,15 +136,10 @@ export class LotteryService {
       [drawId, currency],
     );
     if (g?.board === 'KINO') return { drawId, currency, soldOut: [] };
-    if (g?.board === 'DIGITS3' || g?.board === 'DIGITS2') {
-      const width = g.board === 'DIGITS2' ? 2 : 3;
+    if (g && isResultBoard(g.board)) {
       const tp = await this.triplePayouts(this.db.pool, drawId, currency, g.board);
       const room = BigInt(g.cap) - potentialWin(BigInt(g.min_play), BigInt(g.factor));
-      const full: string[] = [];
-      for (let i = 0; i < 10 ** width; i++) {
-        const n = String(i).padStart(width, '0');
-        if (tp.payout(n) > room) full.push(n);
-      }
+      const full = allResults(g.board).filter((n) => tp.payout(n) > room);
       if (!full.length) return { drawId, currency, soldOut: [] };
       const ids = await this.db.query(
         `SELECT s.id FROM lottery.symbol s JOIN lottery.draw d ON d.game_id = s.game_id WHERE d.id = $1 AND s.number = ANY($2::text[])`,
@@ -165,8 +172,8 @@ export class LotteryService {
         [drawId, currency],
       )
     ).rows as { code: ModalityCode; number: string; w: string }[];
-    // Terminal Nevado: directo paga con su número y aproximación con los vecinos.
-    const tp = board === 'DIGITS2' ? new TerminalPayouts() : new TriplePayouts();
+    // Cada tablero reparte el premio de una jugada entre los resultados con los que paga.
+    const tp = newResultPayouts(board);
     for (const r of rows) tp.add(r.code, r.number, BigInt(r.w));
     return tp;
   }
@@ -189,7 +196,7 @@ export class LotteryService {
       const tp = await this.triplePayouts(c, drawId, currency, board);
       for (const p of plays.filter((x) => x.drawId === drawId)) {
         const number = symbolNumber.get(p.symbolId)!;
-        const results = board === 'DIGITS2' ? TerminalPayouts.affected(p.modalityCode, number) : TriplePayouts.affected(p.modalityCode, number);
+        const results = affectedResults(board, p.modalityCode, number);
         const worstBefore = results.reduce((m, r) => (tp.payout(r) > m ? tp.payout(r) : m), 0n);
         const win = potentialWin(p.amount, p.factor);
         if (worstBefore + win > cap) {
@@ -495,7 +502,7 @@ export class LotteryService {
     const symbolName = new Map<string, string>(symbols.rows.map((s) => [s.id, s.name]));
     const symbolNumber = new Map<string, string>(symbols.rows.map((s) => [s.id, s.number]));
 
-    if (game.board === 'DIGITS3' || game.board === 'DIGITS2') {
+    if (isResultBoard(game.board)) {
       await this.checkTripleCap(c, plays, currency, cap, symbolNumber, game.board);
     } else if (kino) {
       await this.checkKinoCap(c, plays, currency, cap);

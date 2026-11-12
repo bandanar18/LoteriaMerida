@@ -1,4 +1,4 @@
-import { KINO_NUMBERS, MERIDA_ANIMALS, PARAMO_FRUITS, TERMINAL_NUMBERS, TRIPLE_NUMBERS, parseAmount } from '@loteria/domain';
+import { CONDOR_SYMBOLS, CUATRIFECTA_NUMBERS, DUPLETA_SYMBOLS, KINO_NUMBERS, MERIDA_ANIMALS, PARAMO_FRUITS, TERMINAL_NUMBERS, TRIPLE_NUMBERS, parseAmount } from '@loteria/domain';
 import * as argon2 from 'argon2';
 import { Pool } from 'pg';
 import { AuditService } from '../audit/audit.service';
@@ -13,7 +13,7 @@ import { seedSports } from './seed-sports';
  */
 type Limits = Record<'VES' | 'USDT', { min: string; max: string; ticket: string; liability: string; perDraw?: string }>;
 type SeedModality = {
-  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL';
+  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL' | 'NUMBER' | 'COLOR' | 'PAIR' | 'MATCH5' | 'MATCH4' | 'MATCH3' | 'REVERSED' | 'PARITY';
   name: string;
   min: number;
   max: number | null;
@@ -64,6 +64,47 @@ const TERMINAL_MODALITIES: SeedModality[] = [
   // Las 2: el número juega directo y aproximación y cobra uno solo. 50× / 10× sobre lo pagado = la mitad en cada una (RTP 70 %).
   { code: 'DUAL', name: 'Las 2', min: 1, max: 1, factorX100: 5000, status: 'ACTIVE', description: 'Tu número juega en directo y en aproximación; cobras un solo premio: 50× si sale tu número, 10× si sale el anterior o el siguiente.' },
   { code: 'SUPER', name: 'Súper terminal', min: 1, max: 1, factorX100: 25000, status: 'PENDING_APPROVAL', description: 'Condición de premio todavía no definida (manual MER-04, Anexo B.1). 250× propuesto.' },
+];
+
+// Manual MER-09 «Cóndor Dorado», cláusula décima octava: factores brutos ilustrativos 500× / 50× / 5×.
+// Ojo: con 400 resultados, número + color y solo color devuelven 125 % de lo apostado (la casa pierde en promedio).
+const CONDOR_MODALITIES: SeedModality[] = [
+  { code: 'EXACT', name: 'Número + color', min: 1, max: 1, factorX100: 50000, status: 'ACTIVE', description: 'Eliges un número del 00 al 99 y un color. Si salen los dos, cobras 500× lo apostado.' },
+  { code: 'NUMBER', name: 'Solo número', min: 1, max: 1, factorX100: 5000, status: 'ACTIVE', description: 'Eliges un número del 00 al 99, sin importar el color. Si sale, cobras 50× lo apostado.' },
+  { code: 'COLOR', name: 'Solo color', min: 1, max: 1, factorX100: 500, status: 'ACTIVE', description: 'Eliges un color: rojo, azul, verde o amarillo. Si sale, cobras 5× lo apostado.' },
+];
+
+// Manual MER-06 «Centena Andina», cláusula décima octava: 200× / 40× / 20×. Las condiciones de Aproximación y Par andino
+// vienen de la infografía (FUR); el manual las da «por precisar» (Anexo B.1) y pide no activarlas hasta definirlas.
+const CENTENA_MODALITIES: SeedModality[] = [
+  { code: 'EXACT', name: 'Centena exacta', min: 1, max: 1, factorX100: 20000, status: 'ACTIVE', description: 'Aciertas las tres cifras en el mismo orden (009 gana solo si sale 009). Cobras 200× lo apostado.' },
+  { code: 'TERMINAL', name: 'Aproximación', min: 1, max: 1, factorX100: 4000, status: 'PENDING_APPROVAL', description: 'Aciertas las dos últimas cifras en el mismo orden (09 gana si sale 009, 109, 209…). Cobras 40× lo apostado.' },
+  { code: 'PAIR', name: 'Par andino', min: 1, max: 1, factorX100: 2000, status: 'PENDING_APPROVAL', description: 'Aciertas las dos últimas cifras en cualquier orden (90 gana si termina en 90 o en 09). Cobras 20× lo apostado.' },
+];
+
+// Manual MER-10 «Andes 5 Estrella», cláusula décima octava: 5.000× / 1.000× / 50×. Cada modalidad es una línea aparte y pide
+// aciertos EXACTOS (Cuadro III). Sobre C(40,5) = 658.008 combinaciones devuelven 0,8 %, 26,6 % y 45,2 % de lo apostado.
+const ANDES5_MODALITIES: SeedModality[] = [
+  { code: 'MATCH5', name: '5 números exactos', min: 5, max: 5, factorX100: 500000, status: 'ACTIVE', description: 'Eliges 5 números del 01 al 40; se extraen 5. Si salen tus cinco, en cualquier orden, cobras 5.000× lo apostado.' },
+  { code: 'MATCH4', name: '4 aciertos', min: 5, max: 5, factorX100: 100000, status: 'ACTIVE', description: 'Eliges 5 números; ganas si salen exactamente 4 de ellos. Cobras 1.000× lo apostado.' },
+  { code: 'MATCH3', name: '3 aciertos', min: 5, max: 5, factorX100: 5000, status: 'ACTIVE', description: 'Eliges 5 números; ganas si salen exactamente 3 de ellos. Cobras 50× lo apostado.' },
+];
+
+// Manual MER-08 «Cuatrifecta de Cumbres», cláusula décima octava: 2.000× / 300× / 100×.
+// Terminal 4 cifras es indistinguible de la exacta (Anexo B.1) y la aproximación no tiene definidos los extremos (B.2): pendientes.
+const CUATRIFECTA_MODALITIES: SeedModality[] = [
+  { code: 'EXACT', name: 'Cuatrifecta exacta', min: 1, max: 1, factorX100: 200000, status: 'ACTIVE', description: 'Aciertas las cuatro cifras en el mismo orden (1234 gana solo si sale 1234). Cobras 2.000× lo apostado.' },
+  { code: 'SUPER', name: 'Terminal 4 cifras', min: 1, max: 1, factorX100: 30000, status: 'PENDING_APPROVAL', description: 'Pendiente de rediseño: el manual la describe igual que la cuatrifecta exacta pero con otro pago (Anexo B.1). 300× propuesto.' },
+  { code: 'APPROX', name: 'Aproximación', min: 1, max: 1, factorX100: 10000, status: 'PENDING_APPROVAL', description: 'Ganas si sale el número inmediatamente anterior o posterior al tuyo (juegas 1234: gana con 1233 o 1235). Cobras 100× lo apostado.' },
+];
+
+// Manual MER-07 «Dupleta de Montaña», cláusula décima octava: 150× / 75× / 20×. Sobre 9.900 parejas, exacta e invertida
+// devuelven 1,5 % y 0,8 %. Doble paridad queda pendiente: el manual no define cómo se apuesta (Anexo B.2) y a 20× sobre un
+// evento de ~25 % devolvería ~495 % de lo apostado.
+const DUPLETA_MODALITIES: SeedModality[] = [
+  { code: 'EXACT', name: 'Dupleta exacta', min: 1, max: 1, factorX100: 15000, status: 'ACTIVE', description: 'Dos números distintos del 00 al 99, en el orden en que salen (25-52 gana solo si sale primero 25 y luego 52). Cobras 150× lo apostado.' },
+  { code: 'REVERSED', name: 'Dupleta invertida', min: 1, max: 1, factorX100: 7500, status: 'ACTIVE', description: 'Tus dos números salen en orden contrario (juegas 25-52: gana si sale 52-25). Cobras 75× lo apostado.' },
+  { code: 'PARITY', name: 'Doble paridad', min: 1, max: 1, factorX100: 2000, status: 'PENDING_APPROVAL', description: 'Pendiente: el manual no define cómo se apuesta a la paridad (Anexo B.2). 20× propuesto.' },
 ];
 
 const GAMES = [
@@ -170,6 +211,117 @@ const GAMES = [
     displayOrder: 5,
     board: 'DIGITS2',
   },
+  {
+    // Manual MER-09 «Cóndor Dorado» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
+    code: 'MER-09',
+    name: 'Cóndor Dorado',
+    resultSource: 'MANUAL',
+    // Cláusula novena: 10:00, 14:00 y 18:00 (hora de Venezuela), cierre 5 min antes.
+    times: ['10:00', '14:00', '18:00'],
+    payoutMultiplier: '500.00',
+    license: 'Propuesta conceptual MER-09 · sin autorización oficial',
+    animals: CONDOR_SYMBOLS,
+    modalities: CONDOR_MODALITIES,
+    // Tope de pago por resultado: Bs. 200 × 500 (número + color) más lo que sume solo número y solo color.
+    limits: {
+      VES: { min: '5', max: '200', ticket: '10000', liability: '120000', perDraw: '5000' },
+      USDT: { min: '0.10', max: '5', ticket: '250', liability: '3000', perDraw: '125' },
+    } as Limits,
+    rulesVersion: 'MER-09 v1.0-borrador',
+    merida: true,
+    prizeExpiryDays: 3 as number | null,
+    displayOrder: 6,
+    board: 'COLOR',
+  },
+  {
+    // Manual MER-06 «Centena Andina» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
+    code: 'MER-06',
+    name: 'Centena Andina',
+    resultSource: 'MANUAL',
+    // Cláusula novena: 09:00, 14:00 y 21:00 (hora de Venezuela), cierre 5 min antes.
+    times: ['09:00', '14:00', '21:00'],
+    payoutMultiplier: '200.00',
+    license: 'Propuesta conceptual MER-06 · sin autorización oficial',
+    animals: TRIPLE_NUMBERS,
+    modalities: CENTENA_MODALITIES,
+    // Tope de pago por resultado: Bs. 500 × 200 (centena exacta) más aproximación y par andino.
+    limits: {
+      VES: { min: '5', max: '500', ticket: '10000', liability: '120000', perDraw: '5000' },
+      USDT: { min: '0.10', max: '12.50', ticket: '250', liability: '3000', perDraw: '125' },
+    } as Limits,
+    rulesVersion: 'MER-06 v1.0-borrador',
+    merida: true,
+    prizeExpiryDays: 3 as number | null,
+    displayOrder: 7,
+    board: 'DIGITS3',
+  },
+  {
+    // Manual MER-10 «Andes 5 Estrella» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
+    code: 'MER-10',
+    name: 'Andes 5 Estrella',
+    resultSource: 'MANUAL',
+    // Cláusula novena: 10:00, 14:00 y 20:00 (hora de Venezuela), cierre 5 min antes.
+    times: ['10:00', '14:00', '20:00'],
+    payoutMultiplier: '5000.00',
+    license: 'Propuesta conceptual MER-10 · sin autorización oficial',
+    animals: KINO_NUMBERS,
+    modalities: ANDES5_MODALITIES,
+    // Tope de pago por combinación jugada: Bs. 50 × 5.000.
+    limits: {
+      VES: { min: '5', max: '50', ticket: '10000', liability: '250000', perDraw: '5000' },
+      USDT: { min: '0.10', max: '1.25', ticket: '250', liability: '6250', perDraw: '125' },
+    } as Limits,
+    rulesVersion: 'MER-10 v1.0-borrador',
+    merida: true,
+    prizeExpiryDays: 3 as number | null,
+    displayOrder: 8,
+    board: 'KINO',
+    drawCount: 5,
+  },
+  {
+    // Manual MER-08 «Cuatrifecta de Cumbres» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
+    code: 'MER-08',
+    name: 'Cuatrifecta de Cumbres',
+    resultSource: 'MANUAL',
+    // Cláusula novena: 09:30, 13:30 y 18:30 (hora de Venezuela), cierre 5 min antes.
+    times: ['09:30', '13:30', '18:30'],
+    payoutMultiplier: '2000.00',
+    license: 'Propuesta conceptual MER-08 · sin autorización oficial',
+    animals: CUATRIFECTA_NUMBERS,
+    modalities: CUATRIFECTA_MODALITIES,
+    // Tope de pago por resultado: Bs. 100 × 2.000 (cuatrifecta exacta) más aproximación.
+    limits: {
+      VES: { min: '5', max: '100', ticket: '10000', liability: '250000', perDraw: '5000' },
+      USDT: { min: '0.10', max: '2.50', ticket: '250', liability: '6250', perDraw: '125' },
+    } as Limits,
+    rulesVersion: 'MER-08 v1.0-borrador',
+    merida: true,
+    prizeExpiryDays: 3 as number | null,
+    displayOrder: 9,
+    board: 'DIGITS4',
+  },
+  {
+    // Manual MER-07 «Dupleta de Montaña» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
+    code: 'MER-07',
+    name: 'Dupleta de Montaña',
+    resultSource: 'MANUAL',
+    // Cláusula novena: 09:00, 12:00, 16:00 y 20:00 (hora de Venezuela), cierre 5 min antes.
+    times: ['09:00', '12:00', '16:00', '20:00'],
+    payoutMultiplier: '150.00',
+    license: 'Propuesta conceptual MER-07 · sin autorización oficial',
+    animals: DUPLETA_SYMBOLS,
+    modalities: DUPLETA_MODALITIES,
+    // Tope de pago por resultado: Bs. 500 × 150 (exacta) más la invertida que pague con esa misma pareja.
+    limits: {
+      VES: { min: '5', max: '500', ticket: '10000', liability: '120000', perDraw: '5000' },
+      USDT: { min: '0.10', max: '12.50', ticket: '250', liability: '3000', perDraw: '125' },
+    } as Limits,
+    rulesVersion: 'MER-07 v1.0-borrador',
+    merida: true,
+    prizeExpiryDays: 3 as number | null,
+    displayOrder: 10,
+    board: 'DUO',
+  },
 ];
 
 /** Jugadores de prueba DEMO. Datos ficticios; la contraseña común viene de SEED_TEST_PLAYERS_PASSWORD (.env). */
@@ -205,13 +357,14 @@ async function main() {
         [g.code, g.name, g.resultSource, g.license, g.rulesVersion, g.merida, g.prizeExpiryDays, g.displayOrder, g.payoutMultiplier, 'board' in g ? g.board : 'SYMBOLS', 'drawCount' in g ? g.drawCount : 1],
       );
       const gameId = res.rows[0].id;
-      for (const [i, a] of g.animals.entries()) {
-        await client.query(
-          `INSERT INTO lottery.symbol (game_id, number, name, emoji, sort) VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (game_id, number) DO NOTHING`,
-          [gameId, a.number, a.name, a.emoji, i],
-        );
-      }
+      // En un solo INSERT (Cuatrifecta trae 10.000 símbolos).
+      await client.query(
+        `INSERT INTO lottery.symbol (game_id, number, name, emoji, sort)
+         SELECT $1, s.number, s.name, s.emoji, s.sort - 1
+           FROM unnest($2::text[], $3::text[], $4::text[]) WITH ORDINALITY AS s(number, name, emoji, sort)
+         ON CONFLICT (game_id, number) DO NOTHING`,
+        [gameId, g.animals.map((a) => a.number), g.animals.map((a) => a.name), g.animals.map((a) => a.emoji)],
+      );
       for (const [i, m] of g.modalities.entries()) {
         await client.query(
           `INSERT INTO lottery.modality (game_id, code, name, min_selections, max_selections, factor_x100, status, description, sort)

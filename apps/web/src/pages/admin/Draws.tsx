@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ErrorBox, Modal, Notice, PageTitle, Spinner, StatusBadge } from '../../components/ui';
 import { get, getBlob, post } from '../../lib/api';
 import { Currency, dateTime, DRAW_STATUS_LABEL, hour, money, todayCaracas } from '../../lib/format';
-import { Game, symbolWords, useAdminGames } from '../../lib/queries';
+import { Game, symbolWords, useAdminGames, useGameSymbols } from '../../lib/queries';
 import { NumberBalls } from '../../components/SymbolArt';
 
 export function DrawsPage() {
@@ -116,6 +116,7 @@ export function DrawsPage() {
 
 function DrawPanel({ draw, game }: { draw: any; game: Game }) {
   const w = symbolWords(game);
+  const symbols = useGameSymbols(game);
   const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>('VES');
   const [symbolId, setSymbolId] = useState('');
@@ -124,7 +125,7 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
   const [kinoText, setKinoText] = useState('');
   const kinoNumbers = kinoText.split(/[^0-9]+/).filter(Boolean).map(Number);
   const kinoOk =
-    kinoNumbers.length === game.draw_count && new Set(kinoNumbers).size === kinoNumbers.length && kinoNumbers.every((n) => n >= 1 && n <= game.symbols.length);
+    kinoNumbers.length === game.draw_count && new Set(kinoNumbers).size === kinoNumbers.length && kinoNumbers.every((n) => n >= 1 && n <= game.symbol_count);
   const [evidence, setEvidence] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const exposure = useQuery({
@@ -177,7 +178,7 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
                 <div className="flex items-center gap-2 text-xs">
                   <NumberBalls numbers={kinoNumbers} />
                   <span className={kinoOk ? 'text-emerald-700' : 'text-black/50'}>
-                    {kinoOk ? 'Listo' : `${kinoNumbers.length} de ${game.draw_count}, distintos, del 01 al ${game.symbols.length}`}
+                    {kinoOk ? 'Listo' : `${kinoNumbers.length} de ${game.draw_count}, distintos, del 01 al ${game.symbol_count}`}
                   </span>
                 </div>
               )}
@@ -185,7 +186,7 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
           ) : (
           <select className="input" value={symbolId} onChange={(e) => setSymbolId(e.target.value)}>
             <option value="">Selecciona {w.one === 'fruta' ? 'la fruta' : w.one === 'número' ? 'el número' : 'el animal'}…</option>
-            {game.symbols.map((s) => (
+            {symbols.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.number} {s.name !== s.number ? s.name : ''}
               </option>

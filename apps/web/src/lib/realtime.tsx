@@ -85,7 +85,7 @@ export function LiveDot({ dark }: { dark?: boolean }) {
   const color = state === 'live' ? 'bg-emerald-400' : state === 'connecting' ? 'bg-amber-400' : 'bg-red-500';
   const label = state === 'live' ? 'En vivo' : state === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo';
   return (
-    <span className={`flex items-center gap-1.5 text-xs ${dark ? 'text-white/70' : 'text-black/50'}`} title={label}>
+    <span className={`flex items-center gap-1.5 text-xs whitespace-nowrap ${dark ? 'text-white/70' : 'text-black/50'}`} title={label}>
       <span className={`relative flex h-2 w-2`}>
         {state === 'live' && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${color} opacity-60`} />}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${color}`} />

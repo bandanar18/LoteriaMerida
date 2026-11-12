@@ -98,11 +98,40 @@ export function modalityMarginBps(board: string, code: string, factorX100: bigin
     if (code === 'APPROX') return houseMarginBpsTiers([[factorX100, 2]], 100);
     if (code === 'DUAL') return houseMarginBpsTiers([[factorX100, 1], [factorX100 / 5n, 2]], 100);
   }
+  if (board === 'DUO') {
+    // Dupleta de Montaña: 9.900 parejas ordenadas; exacta e invertida pagan con una sola.
+    if (code === 'EXACT' || code === 'REVERSED') return houseMarginBpsTiers([[factorX100, 1]], 9900);
+  }
+  if (board === 'DIGITS4') {
+    // Cuatrifecta de Cumbres: 10.000 resultados. Aproximación paga con el anterior y el siguiente (2, salvo en 0000 y 9999).
+    if (code === 'EXACT') return houseMarginBpsTiers([[factorX100, 1]], 10000);
+    if (code === 'APPROX') return houseMarginBpsTiers([[factorX100, 2]], 10000);
+  }
+  if (board === 'COLOR') {
+    // Cóndor Dorado: 400 resultados; número + color paga con 1, solo número con 4, solo color con 100.
+    if (code === 'EXACT') return houseMarginBpsTiers([[factorX100, 1]], 400);
+    if (code === 'NUMBER') return houseMarginBpsTiers([[factorX100, 4]], 400);
+    if (code === 'COLOR') return houseMarginBpsTiers([[factorX100, 100]], 400);
+  }
   if (board === 'DIGITS3') {
     if (code === 'EXACT') return houseMarginBpsTiers([[factorX100, 1]], 1000);
     if (code === 'TERMINAL') return houseMarginBpsTiers([[factorX100, 10]], 1000);
     if (code === 'LAST_DIGIT') return houseMarginBpsTiers([[factorX100, 100]], 1000);
+    // Par andino: hasta 20 resultados (10 con cada orden); se toma el caso de cifras distintas, el más caro.
+    if (code === 'PAIR') return houseMarginBpsTiers([[factorX100, 20]], 1000);
     if (code === 'FULL') return houseMarginBpsTiers([[factorX100, 1], [factorX100 / 10n, 9], [factorX100 / 100n, 90]], 1000);
+  }
+  if (board === 'KINO' && /^MATCH[345]$/.test(code)) {
+    // Andes 5 Estrella: 5 elegidos, 5 extraídos de 40; exactamente h aciertos. P = C(5,h)·C(35,5−h)/C(40,5).
+    const h = Number(code.slice(5));
+    const c = (n: number, r: number) => {
+      let x = 1n;
+      for (let i = 0; i < r; i++) x = (x * BigInt(n - i)) / BigInt(i + 1);
+      return x;
+    };
+    const wins = c(5, h) * c(35, 5 - h);
+    const total = c(40, 5);
+    return Number(10000n - (factorX100 * wins * 100n + total - 1n) / total);
   }
   if (board === 'KINO') {
     const k = Number(code.replace('KINO', ''));

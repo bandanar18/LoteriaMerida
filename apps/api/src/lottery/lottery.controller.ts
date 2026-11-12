@@ -15,6 +15,12 @@ export class LotteryController {
   }
 
   @Public()
+  @Get('games/:id/symbols')
+  symbols(@Param('id', ParseUUIDPipe) id: string) {
+    return this.lottery.gameSymbols(id);
+  }
+
+  @Public()
   @Get('games/:id/draws')
   draws(@Param('id', ParseUUIDPipe) id: string, @Query() q: DrawsQueryDto) {
     return this.lottery.listDraws(id, q.date);

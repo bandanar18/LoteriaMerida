@@ -16,11 +16,41 @@ export function SymbolArt({
 }) {
   if (numbers?.length) return <NumberBalls numbers={numbers} />;
   if (emoji) return <span className={className}>{emoji}</span>;
+  // Cóndor Dorado: «67-ROJO» (número + color), «ROJO» (solo color).
+  // Dupleta de Montaña: «25-52» como dos bolitas, en el orden en que salen.
+  const duo = number.match(/^(\d{2})-(\d{2})$/);
+  if (duo) return <NumberBalls numbers={[Number(duo[1]), Number(duo[2])]} size="md" />;
+  const condor = number.match(CONDOR_RE);
+  if (condor) return <ColorBall number={condor[1]} color={condor[2]} className={className} />;
   return (
     <span
       className={`inline-flex min-w-[1.6em] items-center justify-center rounded-full bg-gradient-to-br from-oro-300 to-amber-400 px-[0.35em] py-[0.2em] text-[0.55em] leading-none font-extrabold tabular-nums text-selva-950 shadow-sm ring-1 ring-black/10 ${className}`}
     >
       {number}
+    </span>
+  );
+}
+
+const CONDOR_RE = /^(?:(\d{2})-)?(ROJO|AZUL|VERDE|AMARILLO)$/;
+
+/** Colores de Cóndor Dorado: fondo de la bolita y su nombre para lectores de pantalla. */
+export const CONDOR_BALL: Record<string, { cls: string; name: string }> = {
+  ROJO: { cls: 'from-red-500 to-red-700 text-white', name: 'Rojo' },
+  AZUL: { cls: 'from-blue-500 to-blue-700 text-white', name: 'Azul' },
+  VERDE: { cls: 'from-green-500 to-green-700 text-white', name: 'Verde' },
+  AMARILLO: { cls: 'from-yellow-300 to-amber-400 text-amber-950', name: 'Amarillo' },
+};
+
+/** Bolita de color con su número (o sin número, para «solo color»). Tamaño en em, como el resto de dibujos. */
+export function ColorBall({ number, color, className = '' }: { number?: string; color: string; className?: string }) {
+  const c = CONDOR_BALL[color] ?? CONDOR_BALL.ROJO;
+  return (
+    <span
+      role="img"
+      aria-label={number ? `${number} ${c.name}` : c.name}
+      className={`inline-flex h-[1.1em] w-[1.1em] shrink-0 items-center justify-center rounded-full bg-gradient-to-br align-middle leading-none font-extrabold tabular-nums shadow-[inset_0_-2px_4px_rgba(0,0,0,.25)] ring-2 ring-white/80 ${c.cls} ${className}`}
+    >
+      <span className="text-[0.48em]">{number ?? ''}</span>
     </span>
   );
 }

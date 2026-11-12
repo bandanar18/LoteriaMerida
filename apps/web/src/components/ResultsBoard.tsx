@@ -104,7 +104,7 @@ export function DayGrid({ draws, latestId, nextId, onVerify }: { draws: Draw[]; 
             disabled={!onVerify}
             onClick={() => onVerify?.(d.id)}
             className={`relative flex min-h-[7.5rem] flex-col items-center rounded-2xl px-1 pt-2 pb-2 text-center ring-1 transition enabled:active:scale-[0.97] ${
-              isLatest ? 'bg-oro-300/40 ring-2 ring-oro-500' : r ? 'bg-white ring-black/10' : 'bg-black/[0.03] ring-black/5'
+              isLatest ? 'bg-gradient-to-b from-[#0f3d2a] to-[#0a2a1c] text-white ring-2 ring-lima-500' : r ? 'bg-white ring-black/10' : 'bg-white/85 ring-black/5'
             }`}
             aria-label={`${hour(d.draw_at)}:${r ? `${r.number} ${symbolName(r.number, r.name)}` : statusText(d)}`}
           >
@@ -155,26 +155,29 @@ export function RecentStrip({ game }: { game: Game }) {
   if (withResult.length === 0) return null;
   const today = todayCaracas();
   return (
-    <section className="card p-3">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-selva-900">Últimos resultados</h2>
-        <Link to="/resultados" className="text-xs font-medium text-selva-700">
+    <section className="card p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="title-display text-2xl text-selva-900 sm:text-[1.7rem]">Últimos resultados</h2>
+        <Link to="/resultados" className="rounded-lg px-2 py-1 text-sm font-semibold text-lima-600 hover:bg-lima-500/10">
           Ver todos →
         </Link>
       </div>
-      <div className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3">
+      <div className="no-scrollbar -mx-4 -my-1 flex gap-2 overflow-x-auto px-4 py-1 sm:-mx-5 sm:gap-2.5 sm:px-5">
         {withResult.map((d) => {
           const r = shownResult(d)!;
           const isToday = todayCaracas(new Date(d.draw_at)) === today;
+          const last = d.id === latest?.id;
           return (
             <div
               key={d.id}
-              className={`flex ${r.numbers ? "w-[6.5rem] px-1" : "w-[4.25rem]"} shrink-0 flex-col items-center rounded-xl py-1.5 ring-1 ${d.id === latest?.id ? 'bg-oro-300/40 ring-oro-500' : 'bg-selva-900/[0.03] ring-black/5'}`}
+              className={`relative flex ${r.numbers ? 'w-[8.5rem] px-1.5' : 'w-[5.5rem]'} shrink-0 flex-col items-center rounded-2xl py-2.5 ring-1 ${
+                last ? 'bg-gradient-to-b from-[#0f3d2a] to-[#0a2a1c] text-white ring-2 ring-lima-500' : 'bg-selva-900/[0.03] ring-black/5'
+              }`}
             >
-              <div className="text-[10px] font-semibold text-black/50 tabular-nums">{hour(d.draw_at).replace(':00', '')}</div>
-              <div className="text-2xl leading-tight"><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
-              {r.emoji && <div className="text-xs font-extrabold text-selva-900 tabular-nums">{r.number}</div>}
-              <div className="text-[9px] text-black/40">{isToday ? 'hoy' : 'ayer'}</div>
+              <div className={`text-xs font-semibold tabular-nums ${last ? 'text-lima-400' : 'text-black/50'}`}>{hour(d.draw_at).replace(':00', '')}</div>
+              <div className="my-0.5 text-[2.1rem] leading-tight"><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
+              {r.emoji && <div className={`text-base font-extrabold tabular-nums ${last ? 'text-oro-300' : 'text-selva-900'}`}>{r.number}</div>}
+              <div className={`text-[11px] ${last ? 'text-white/60' : 'text-black/40'}`}>{isToday ? 'hoy' : 'ayer'}</div>
             </div>
           );
         })}

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fairIndex, kinoWinProbability } from '@loteria/domain';
+import { fairIndex, pickWinProbability } from '@loteria/domain';
 import { createHash, randomInt } from 'crypto';
 import { DbService } from '../common/db.service';
 import { BusinessError } from '../common/errors';
@@ -60,7 +60,8 @@ export class AnalyticsService {
   async overview(gameId: string, currency: string, days: number, endDate?: string) {
     const game = await this.db.one(
       `SELECT g.id, g.code, g.name, g.timezone, g.board, g.draw_count,
-              (SELECT m.factor_x100 FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5') ORDER BY m.code = 'EXACT' DESC LIMIT 1)::text AS factor_x100
+              (SELECT m.factor_x100 FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5', 'MATCH5') ORDER BY m.code = 'EXACT' DESC LIMIT 1)::text AS factor_x100,
+              (SELECT m.code FROM lottery.modality m WHERE m.game_id = g.id AND m.code IN ('EXACT', 'KINO5', 'MATCH5') ORDER BY m.code = 'EXACT' DESC LIMIT 1) AS factor_code
          FROM lottery.game g WHERE g.id = $1`,
       [gameId],
     );
@@ -234,7 +235,7 @@ export class AnalyticsService {
           AND t.currency = $2 AND NOT t.is_simulation`,
       [drawRows.map((r) => r.id), currency],
     );
-    const houseEdge = n > 0 ? 1 - (Number(game.factor_x100) / 100) * (kino ? kinoWinProbability(5) : 1 / n) : 0;
+    const houseEdge = n > 0 ? 1 - (Number(game.factor_x100) / 100) * (kino ? pickWinProbability(game.factor_code, game.draw_count) : 1 / n) : 0;
 
     return {
       game: { id: game.id, code: game.code, name: game.name, symbols: n, factor_x100: game.factor_x100 },

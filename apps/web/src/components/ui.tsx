@@ -69,7 +69,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:max-w-lg sm:rounded-3xl"
+        className="surface max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:max-w-lg sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={title}
@@ -87,17 +87,18 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="py-10 text-center text-sm text-black/50">{children}</div>;
+  return <div className="py-10 text-center text-sm text-(--muted)">{children}</div>;
 }
 
 export function Spinner() {
-  return <div className="py-10 text-center text-sm text-black/40">Cargando…</div>;
+  return <div className="py-10 text-center text-sm text-(--muted)">Cargando…</div>;
 }
 
+/** El color sale de --ink: oscuro sobre fondo claro (backoffice, tarjetas) y blanco sobre el fondo oscuro del jugador. */
 export function PageTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <h1 className="text-xl font-bold text-selva-900">{children}</h1>
+      <h1 className="text-xl font-bold text-(--ink)">{children}</h1>
       {actions}
     </div>
   );

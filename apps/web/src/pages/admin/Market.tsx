@@ -5,7 +5,7 @@ import { ErrorBox, Modal, Spinner } from '../../components/ui';
 import { ApiError, get, post, put } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { Currency, CURRENCY, dateTime, hour, money, TICKET_STATUS_LABEL, todayCaracas, useNow } from '../../lib/format';
-import { playedLabel, symbolWords, useGames, useSimulationStatus } from '../../lib/queries';
+import { playedLabel, symbolWords, useGames, useGameSymbols, useSimulationStatus } from '../../lib/queries';
 import { symbolName } from '../../components/SymbolArt';
 
 type Words = ReturnType<typeof symbolWords>;
@@ -194,6 +194,7 @@ export function MarketPage() {
   const [gameId, setGameId] = useState<string>();
   const game = games.data?.find((g) => g.id === gameId) ?? games.data?.find((g) => g.code === 'MER-05') ?? games.data?.[0];
   const words = symbolWords(game);
+  const symbols = useGameSymbols(game);
 
   const ov = useQuery({
     queryKey: ['admin', 'analytics', game?.id, currency, days],
@@ -236,7 +237,7 @@ export function MarketPage() {
 
       {user?.role === 'ADMIN' && game && game.board !== 'KINO' && (
         <div className="mt-3">
-          <NextBandPanel key={game.id} gameId={game.id} demo={game.is_demo} catalog={game.symbols} words={words} />
+          <NextBandPanel key={game.id} gameId={game.id} demo={game.is_demo} catalog={symbols} words={words} />
         </div>
       )}
       {games.error || ov.error ? (
