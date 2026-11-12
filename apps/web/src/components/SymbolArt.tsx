@@ -8,13 +8,24 @@ export function SymbolArt({
   number,
   numbers,
   className = '',
+  star,
 }: {
   emoji?: string | null;
   number: string;
   numbers?: number[] | null;
   className?: string;
+  /** Andes 5 Estrella: estrella del resultado o de la jugada. */
+  star?: number | null;
 }) {
-  if (numbers?.length) return <NumberBalls numbers={numbers} />;
+  if (numbers?.length)
+    return star ? (
+      <span className="inline-flex items-center gap-1">
+        <NumberBalls numbers={numbers} />
+        <StarBadge n={star} />
+      </span>
+    ) : (
+      <NumberBalls numbers={numbers} />
+    );
   if (emoji) return <span className={className}>{emoji}</span>;
   // Cóndor Dorado: «67-ROJO» (número + color), «ROJO» (solo color).
   // Dupleta de Montaña: «25-52» como dos bolitas, en el orden en que salen.
@@ -27,6 +38,20 @@ export function SymbolArt({
       className={`inline-flex min-w-[1.6em] items-center justify-center rounded-full bg-gradient-to-br from-oro-300 to-amber-400 px-[0.35em] py-[0.2em] text-[0.55em] leading-none font-extrabold tabular-nums text-selva-950 shadow-sm ring-1 ring-black/10 ${className}`}
     >
       {number}
+    </span>
+  );
+}
+
+/** Estrella dorada con su número (Andes 5 Estrella). */
+export function StarBadge({ n, hit }: { n: number; hit?: boolean | null }) {
+  return (
+    <span
+      role="img"
+      aria-label={`Estrella ${n}`}
+      className={`relative inline-flex h-[1.5rem] w-[1.5rem] shrink-0 items-center justify-center align-middle ${hit === false ? 'opacity-50 grayscale' : ''}`}
+    >
+      <span className="absolute inset-0 text-[1.5rem] leading-none" aria-hidden="true">⭐</span>
+      <span className="relative mt-[2px] text-[10px] font-extrabold text-amber-950">{n}</span>
     </span>
   );
 }

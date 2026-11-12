@@ -12,7 +12,7 @@ export interface Symbol {
 
 export interface Modality {
   id: string;
-  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL' | 'NUMBER' | 'COLOR' | 'PAIR' | 'MATCH5' | 'MATCH4' | 'MATCH3' | 'REVERSED' | 'PARITY';
+  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL' | 'NUMBER' | 'COLOR' | 'PAIR' | 'MATCH5' | 'MATCH4' | 'MATCH3' | 'REVERSED' | 'PARITY' | 'BOX' | 'MATCH5S' | 'MATCH4S' | 'MATCH3S';
   name: string;
   min_selections: number;
   max_selections: number | null;
@@ -37,6 +37,8 @@ export interface Game {
   prize_expiry_days: number | null;
   board: 'SYMBOLS' | 'DIGITS3' | 'KINO' | 'DIGITS2' | 'COLOR' | 'DIGITS4' | 'DUO';
   draw_count: number;
+  /** Andes 5 Estrella: estrellas posibles (1 a star_max); null si el juego no tiene estrella. */
+  star_max?: number | null;
   modalities: Modality[];
   symbols: Symbol[];
   /** Total del catálogo: si es mayor que symbols.length, el catálogo se pide aparte (useGameSymbols). */
@@ -64,6 +66,7 @@ export interface Draw {
   preliminary_emoji: string | null;
   /** Kino: los 7 números extraídos (oficial) o propuestos (preliminar). */
   result_numbers?: number[] | null;
+  result_star?: number | null;
   preliminary_numbers?: number[] | null;
   incident_notice: string | null;
   server_now: string;
@@ -155,17 +158,27 @@ export function matchDigits(code?: string) {
 export function playedLabel(code: string | undefined, number: string) {
   // Cóndor Dorado («67-ROJO»): solo número «67», solo color «ROJO».
   if (code === 'NUMBER') return number.split('-')[0];
+  if (code === 'PARITY') return number === PARITY_SYMBOL.EVEN ? 'Ambos pares' : 'Ambos impares';
   if (code === 'COLOR') return number.split('-')[1] ?? number;
   return code === 'TERMINAL' || code === 'LAST_DIGIT' || code === 'PAIR' ? number.slice(-matchDigits(code)) : number;
 }
 
 /** Kino: cuántos números lleva la modalidad (5, 6 o 7). */
 export function kinoSize(code?: string) {
-  if (code === 'MATCH5' || code === 'MATCH4' || code === 'MATCH3') return 5;
+  if (/^MATCH[345]S?$/.test(code ?? '')) return 5;
   return code === 'KINO5' ? 5 : code === 'KINO6' ? 6 : code === 'KINO7' ? 7 : 0;
 }
 
 /** Andes 5 Estrella: aciertos exactos que pide la modalidad (0 en Kino, donde deben salir todos). */
 export function pickHits(code?: string) {
-  return code === 'MATCH5' ? 5 : code === 'MATCH4' ? 4 : code === 'MATCH3' ? 3 : 0;
+  const m = /^MATCH([345])S?$/.exec(code ?? '');
+  return m ? Number(m[1]) : 0;
 }
+
+/** Andes 5 Estrella: código de la modalidad con estrella (MATCH4 → MATCH4S). */
+export const withStar = (code: string) => `${code}S` as Modality['code'];
+/** ¿Es la versión con estrella de una modalidad? */
+export const isStarCode = (code?: string) => /^MATCH[345]S$/.test(code ?? '');
+
+/** Dupleta «Doble paridad»: la apuesta se guarda como la dupleta «00-02» (ambos pares) o «01-03» (ambos impares). */
+export const PARITY_SYMBOL = { EVEN: '00-02', ODD: '01-03' } as const;

@@ -8,8 +8,8 @@ import { ErrorBox, Modal, Notice, Spinner } from '../components/ui';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { countdown, Currency, dateTime, hour, money, normalizeAmount, todayCaracas, toMinor, useNow } from '../lib/format';
-import { ColorBall, CONDOR_BALL, NumberBalls, SymbolArt, symbolName } from '../components/SymbolArt';
-import { Draw, Game, kinoSize, matchDigits, pickHits, Modality, playedLabel, Symbol, symbolWords, useGames, useGameSymbols, useSimulationStatus } from '../lib/queries';
+import { ColorBall, CONDOR_BALL, NumberBalls, StarBadge, SymbolArt, symbolName } from '../components/SymbolArt';
+import { Draw, Game, isStarCode, kinoSize, matchDigits, PARITY_SYMBOL, pickHits, withStar, Modality, playedLabel, Symbol, symbolWords, useGames, useGameSymbols, useSimulationStatus } from '../lib/queries';
 import { gameArt } from '../lib/gameArt';
 
 interface CartPlay {
@@ -19,6 +19,8 @@ interface CartPlay {
   modality: Modality['code'];
   /** Kino: los números elegidos, ordenados. */
   numbers?: number[];
+  /** Andes 5 Estrella: estrella elegida. */
+  star?: number;
 }
 
 const QUICK_AMOUNTS: Record<Currency, string[]> = {
@@ -153,7 +155,12 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
   const [condorColor, setCondorColor] = useState<string | null>(null);
   const symbolByNumber = useMemo(() => new Map(symbols.map((s) => [s.number, s])), [symbols]);
   const modalityByCode = useMemo(() => new Map(game.modalities.map((m) => [m.code, m])), [game.modalities]);
-  const modality = game.modalities.find((m) => m.code === modalityCode) ?? game.modalities[0];
+  // Andes 5 Estrella: la estrella elegida convierte la modalidad en su versión con estrella (paga ×5).
+  const [star, setStar] = useState<number | null>(null);
+  const starCode = star && game.star_max && pickHits(modalityCode) ? withStar(modalityCode) : null;
+  const modality = game.modalities.find((m) => m.code === (starCode ?? modalityCode)) ?? game.modalities[0];
+  // Pestañas: las versiones con estrella no se muestran aparte.
+  const tabModalities = game.modalities.filter((m) => !isStarCode(m.code));
   const factor = modality?.factor_x100 ?? '3000';
   // «Las 3»: una jugada; exacto paga el factor completo, las 2 últimas 1/10 y la última 1/100. Solo el mayor.
   // «Las 3» (Triple) y «Las 2» (Terminal): una jugada en varias modalidades, cobra un solo premio.
@@ -254,10 +261,10 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
     const numbers = isKino ? [...kinoPicks].sort((a, b) => a - b) : undefined;
     const put = (drawId: string, symbolId: string, code: Modality['code']) => {
       const existing = next.find(
-        (p) => p.drawId === drawId && p.symbolId === symbolId && p.modality === code && (p.numbers?.join() ?? '') === (numbers?.join() ?? ''),
+        (p) => p.drawId === drawId && p.symbolId === symbolId && p.modality === code && (p.numbers?.join() ?? '') === (numbers?.join() ?? '') && (p.star ?? null) === (starCode ? star : null),
       );
       if (existing) existing.amount = normalizeAmount(amount);
-      else next.push({ drawId, symbolId, amount: normalizeAmount(amount), modality: code, ...(numbers ? { numbers } : {}) });
+      else next.push({ drawId, symbolId, amount: normalizeAmount(amount), modality: code, ...(numbers ? { numbers } : {}), ...(starCode && star ? { star } : {}) });
     };
     for (const drawId of selectedDraws) for (const symbolId of selectedSymbols) put(drawId, symbolId, modality.code);
     setCart(next);
@@ -346,12 +353,12 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
               <span aria-hidden>→</span>
             </Link>
           )}
-          {game.modalities.length > 1 && (
+          {tabModalities.length > 1 && (
             <div className="px-4 pt-4 pb-2 sm:px-6">
-              <div className={`grid gap-1.5 rounded-2xl bg-black/5 p-1.5 ${game.modalities.length > 3 ? 'grid-cols-4' : 'grid-cols-3'}`} role="tablist" aria-label="Modalidad">
-                {[...game.modalities].sort((a, b) => Number(b.code === 'FULL' || b.code === 'DUAL') - Number(a.code === 'FULL' || a.code === 'DUAL')).map((m) => {
+              <div className={`grid gap-1.5 rounded-2xl bg-black/5 p-1.5 ${tabModalities.length > 3 ? 'grid-cols-4' : 'grid-cols-3'}`} role="tablist" aria-label="Modalidad">
+                {[...tabModalities].sort((a, b) => Number(b.code === 'FULL' || b.code === 'DUAL') - Number(a.code === 'FULL' || a.code === 'DUAL')).map((m) => {
                   const pending = m.status !== 'ACTIVE';
-                  const active = m.code === modality?.code;
+                  const active = m.code === modalityCode;
                   return (
                     <button
                       key={m.code}
@@ -431,30 +438,78 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
                   : `ganas si salen exactamente ${pickHits(modality?.code)} de tus cinco números.`
                 : 'ganas si salen todos los que elegiste.'}
             </p>
-            {game.code === 'MER-10' && (
-              <p className="-mt-2 mb-4 flex items-center gap-2 text-xs text-black/50">
-                <span aria-hidden="true">⭐</span> La estrella todavía no se juega: su rango y su premio están pendientes de aprobación (manual MER-10, Anexo B.1).
-              </p>
+            {!!game.star_max && pickHits(modalityCode) > 0 && (
+              <div className="mb-4 rounded-2xl bg-amber-400/10 p-3 ring-1 ring-amber-400/40">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-300">
+                  <span aria-hidden="true">⭐</span> Estrella (opcional): si además aciertas la estrella, tu premio es ×5
+                </div>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Estrella">
+                  {Array.from({ length: game.star_max }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={star === n}
+                      onClick={() => setStar(star === n ? null : n)}
+                      className={`flex h-11 w-11 items-center justify-center rounded-full text-lg font-extrabold transition ${
+                        star === n ? 'bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 ring-2 ring-amber-200' : 'bg-white/10 text-white/80 ring-1 ring-white/15 hover:ring-amber-300'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-white/55">
+                  {star
+                    ? `Juegas ${modality?.name}: cobras ${Number(modality?.factor_x100) / 100}× si salen tus números y la estrella ${star}. Sin acertar la estrella, esta jugada no cobra.`
+                    : 'Sin estrella juegas la modalidad normal.'}
+                </p>
+              </div>
             )}
             <KinoPicker size={kSize} value={kinoPicks} onChange={setKinoPicks} />
           </section>
         ) : isDuo ? (
           <section className="card p-5 sm:p-6">
             <StepTitle n={2} className="mb-2">
-              Escribe tu dupleta
+              {modality?.code === 'PARITY' ? 'Elige la paridad' : 'Escribe tu dupleta'}
             </StepTitle>
             <p className="mb-4 text-sm text-black/55">
-              {modality?.code === 'REVERSED'
+              {modality?.code === 'PARITY'
+                ? 'Eliges si los dos números que salen serán pares o impares. Ganas si salen los dos de esa paridad.'
+                : modality?.code === 'REVERSED'
                 ? 'Dos números distintos del 00 al 99. Ganas si salen en orden contrario (juegas 25-52: gana con 52-25).'
                 : 'Dos números distintos del 00 al 99. Ganas si salen los dos en ese mismo orden: primero el primero y luego el segundo.'}
             </p>
+            {modality?.code === 'PARITY' ? (
+              <div className="grid grid-cols-2 gap-3">
+                {(['EVEN', 'ODD'] as const).map((p) => {
+                  const sym = symbolByNumber.get(PARITY_SYMBOL[p]);
+                  const on = !!sym && selectedSymbols.includes(sym.id);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      aria-pressed={on}
+                      disabled={!sym}
+                      onClick={() => sym && setSelectedSymbols(on ? [] : [sym.id])}
+                      className={`rounded-2xl px-4 py-5 text-center ring-1 transition ${on ? 'bg-white ring-2 ring-lima-500' : 'bg-selva-900/[0.04] ring-black/10 hover:ring-lima-500'}`}
+                    >
+                      <div className="title-display text-2xl">{p === 'EVEN' ? 'Ambos pares' : 'Ambos impares'}</div>
+                      <div className="mt-1 text-xs text-black/55">{p === 'EVEN' ? 'Ej.: 24 - 86' : 'Ej.: 25 - 53'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
             <div className="mb-1 grid grid-cols-2 text-center text-xs font-semibold text-black/50">
               <span>Primer número</span>
               <span>Segundo número</span>
             </div>
             <DigitPicker size={4} value={duoDigits} onChange={setDuoDigits} soldOut={modality?.code === 'EXACT' && selectedSymbols.some((id) => soldOut.has(id))} />
+              </>
+            )}
             {duoSame && <div className="mt-3"><Notice tone="warn">Los dos números deben ser distintos.</Notice></div>}
-            {duoKey && !duoSame && (
+            {duoKey && !duoSame && modality?.code !== 'PARITY' && (
               <p className="mt-3 flex items-center justify-center gap-2 text-sm text-black/60">
                 Tu dupleta: <span className="text-2xl"><SymbolArt number={duoKey} /></span>
               </p>
@@ -528,7 +583,9 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
             </StepTitle>
             <p className="mb-4 text-sm text-black/55">
               {width === 4
-                ? modality?.code === 'APPROX'
+                ? modality?.code === 'BOX'
+                  ? 'Del 0000 al 9999. Ganas si salen tus cuatro cifras en cualquier orden (1234 gana con 4321, 2143…).'
+                  : modality?.code === 'APPROX'
                   ? 'Del 0000 al 9999. Ganas si sale el número anterior o el siguiente al tuyo (juegas 1234: gana con 1233 o 1235).'
                   : 'Del 0000 al 9999. Ganas si salen tus cuatro cifras en el mismo orden.'
                 : width === 2
@@ -754,6 +811,7 @@ function TicketPanel(props: {
                     {p.numbers ? (
                       <span className="flex flex-wrap items-center gap-1">
                         {props.modalityByCode.get(p.modality)?.name} <NumberBalls numbers={p.numbers} />
+                        {p.star && <StarBadge n={p.star} />}
                       </span>
                     ) : s.emoji ? <>{s.number} {symbolName(s.number, s.name)}</> : <>{props.modalityByCode.get(p.modality)?.name} {playedLabel(p.modality, s.number)}</>}
                   </div>

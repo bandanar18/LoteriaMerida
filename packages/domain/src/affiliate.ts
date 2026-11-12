@@ -101,11 +101,15 @@ export function modalityMarginBps(board: string, code: string, factorX100: bigin
   if (board === 'DUO') {
     // Dupleta de Montaña: 9.900 parejas ordenadas; exacta e invertida pagan con una sola.
     if (code === 'EXACT' || code === 'REVERSED') return houseMarginBpsTiers([[factorX100, 1]], 9900);
+    // Doble paridad: 50·49 = 2.450 parejas de cada paridad.
+    if (code === 'PARITY') return houseMarginBpsTiers([[factorX100, 2450]], 9900);
   }
   if (board === 'DIGITS4') {
     // Cuatrifecta de Cumbres: 10.000 resultados. Aproximación paga con el anterior y el siguiente (2, salvo en 0000 y 9999).
     if (code === 'EXACT') return houseMarginBpsTiers([[factorX100, 1]], 10000);
     if (code === 'APPROX') return houseMarginBpsTiers([[factorX100, 2]], 10000);
+    // En desorden: hasta 24 órdenes (cifras distintas), el caso más caro.
+    if (code === 'BOX') return houseMarginBpsTiers([[factorX100, 24]], 10000);
   }
   if (board === 'COLOR') {
     // Cóndor Dorado: 400 resultados; número + color paga con 1, solo número con 4, solo color con 100.
@@ -121,16 +125,17 @@ export function modalityMarginBps(board: string, code: string, factorX100: bigin
     if (code === 'PAIR') return houseMarginBpsTiers([[factorX100, 20]], 1000);
     if (code === 'FULL') return houseMarginBpsTiers([[factorX100, 1], [factorX100 / 10n, 9], [factorX100 / 100n, 90]], 1000);
   }
-  if (board === 'KINO' && /^MATCH[345]$/.test(code)) {
+  if (board === 'KINO' && /^MATCH[345]S?$/.test(code)) {
     // Andes 5 Estrella: 5 elegidos, 5 extraídos de 40; exactamente h aciertos. P = C(5,h)·C(35,5−h)/C(40,5).
-    const h = Number(code.slice(5));
+    const h = Number(code.slice(5, 6));
+    const star = code.endsWith('S') ? 5n : 1n; // la estrella acierta 1 de cada 5
     const c = (n: number, r: number) => {
       let x = 1n;
       for (let i = 0; i < r; i++) x = (x * BigInt(n - i)) / BigInt(i + 1);
       return x;
     };
     const wins = c(5, h) * c(35, 5 - h);
-    const total = c(40, 5);
+    const total = c(40, 5) * star;
     return Number(10000n - (factorX100 * wins * 100n + total - 1n) / total);
   }
   if (board === 'KINO') {

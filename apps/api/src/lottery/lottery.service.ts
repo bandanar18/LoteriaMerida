@@ -19,6 +19,8 @@ import {
   PlayValidationError,
   potentialWin,
   hashSeed,
+  hasStar,
+  drawStar,
   ticketTotal,
   validatePlays,
   verifyDraw,
@@ -45,6 +47,7 @@ export const PUBLIC_DRAW_COLUMNS = `
   CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN rs.name END AS result_name,
   CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN rs.emoji END AS result_emoji,
   CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN d.result_numbers END AS result_numbers,
+  CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN d.result_star END AS result_star,
   CASE WHEN pre.id IS NOT NULL THEN d.proposed_numbers END AS preliminary_numbers,
   -- Resultado preliminar (MER-05 §3): visible solo si el juego lo publica y aún no hay acta confirmada.
   pre.number AS preliminary_number, pre.name AS preliminary_name, pre.emoji AS preliminary_emoji,
@@ -95,7 +98,7 @@ export class LotteryService {
   async listGames(includeInactive = false) {
     const games = await this.db.query(
       `SELECT id, code, name, result_source, payout_multiplier::text, close_minutes_before, cancel_window_minutes,
-              timezone, license_ref, rules_version, is_demo, requires_record, publish_preliminary, prize_expiry_days, board, draw_count, status
+              timezone, license_ref, rules_version, is_demo, requires_record, publish_preliminary, prize_expiry_days, board, draw_count, star_max, status
          FROM lottery.game WHERE ($1::boolean OR status = 'ACTIVE') ORDER BY display_order, name`,
       [includeInactive],
     );
@@ -261,7 +264,7 @@ export class LotteryService {
   /** Verificación provably fair de un sorteo (Doc. Maestro §11.2). */
   async verifyDraw(drawId: string) {
     const d = await this.db.one(
-      `SELECT ${PUBLIC_DRAW_COLUMNS}, g.result_source, g.name AS game_name, g.board, g.draw_count
+      `SELECT ${PUBLIC_DRAW_COLUMNS}, g.result_source, g.name AS game_name, g.board, g.draw_count, g.star_max
          FROM lottery.draw d JOIN lottery.game g ON g.id = d.game_id
          LEFT JOIN lottery.symbol rs ON rs.id = d.result_symbol_id
          ${PRELIMINARY_JOIN}
@@ -288,14 +291,20 @@ export class LotteryService {
     if (d.board === 'KINO') {
       const numbers = fairSample(d.server_seed, d.id, n, d.draw_count).map((i) => Number(symbols[i].number));
       const official: number[] | null = d.result_numbers;
+      // Andes 5 Estrella: la estrella sale de la misma semilla con el mensaje "<draw_id>#estrella".
+      const star = d.star_max ? drawStar(d.server_seed, d.id, d.star_max) : null;
+      const numbersOk = !!official && official.length === numbers.length && official.every((x, i) => x === numbers[i]);
       return {
         draw: d,
         revealed: true,
-        algorithm: `bola i = HMAC-SHA256(server_seed, "<draw_id>#<i>:<contador>") → uint32 con muestreo por rechazo, entre los ${n} números que quedan (sin reposición)`,
+        algorithm:
+          `bola i = HMAC-SHA256(server_seed, "<draw_id>#<i>:<contador>") → uint32 con muestreo por rechazo, entre los ${n} números que quedan (sin reposición)` +
+          (d.star_max ? `; estrella = HMAC-SHA256(server_seed, "<draw_id>#estrella:<contador>") mód. ${d.star_max}, + 1` : ''),
         symbols: n,
         hashMatches: hashSeed(d.server_seed) === d.seed_hash,
         computedNumbers: numbers,
-        resultMatches: rng ? !!official && official.length === numbers.length && official.every((x, i) => x === numbers[i]) : null,
+        computedStar: star,
+        resultMatches: rng ? numbersOk && (star === null || star === d.result_star) : null,
       };
     }
     const v = verifyDraw(d.server_seed, d.seed_hash, d.id, n);
@@ -341,7 +350,7 @@ export class LotteryService {
 
     const currency = dto.currency as CurrencyCode;
     const gameRes = await c.query(
-      `SELECT g.id, g.code, g.name, g.license_ref, g.rules_version, g.is_demo, g.board, g.draw_count,
+      `SELECT g.id, g.code, g.name, g.license_ref, g.rules_version, g.is_demo, g.board, g.draw_count, g.star_max,
               l.min_play, l.max_play, l.max_ticket, l.max_liability_per_symbol, l.max_player_per_draw
          FROM lottery.game g JOIN lottery.game_limit l ON l.game_id = g.id AND l.currency = $2
         WHERE g.id = $1 AND g.status = 'ACTIVE' FOR SHARE OF g`,
@@ -408,6 +417,16 @@ export class LotteryService {
         } else if (!symbolId || p.numbers) {
           throw new BusinessError('INVALID_INPUT', 'Cada jugada lleva un símbolo');
         }
+        // Andes 5 Estrella: las modalidades con estrella llevan una del 1 al máximo del juego; las demás, ninguna.
+        let star: number | null = null;
+        if (hasStar(code)) {
+          if (!game.star_max || !Number.isInteger(p.star) || p.star! < 1 || p.star! > game.star_max) {
+            throw new BusinessError('INVALID_INPUT', `Elige una estrella del 1 al ${game.star_max ?? 5}`);
+          }
+          star = p.star!;
+        } else if (p.star != null) {
+          throw new BusinessError('INVALID_INPUT', `La modalidad ${m.name} no lleva estrella`);
+        }
         const err = checkModality(m.rule, selection?.length ?? 1);
         if (err?.code === 'MODALITY_NOT_ACTIVE') {
           throw new BusinessError('MODALITY_NOT_ACTIVE', `La modalidad ${m.name} está pendiente de aprobación y no se puede jugar`, {
@@ -419,6 +438,7 @@ export class LotteryService {
           drawId: p.drawId,
           symbolId: symbolId!,
           selection,
+          star,
           amount: parseAmount(p.amount, currency),
           modalityId: m.id,
           modalityCode: m.code,
@@ -559,9 +579,10 @@ export class LotteryService {
     const ticketId: string = ticketRes.rows[0].id;
     // El factor queda congelado en la jugada: un cambio posterior de tabla no altera tickets vendidos.
     await c.query(
-      `INSERT INTO lottery.play (ticket_id, draw_id, symbol_id, amount, potential_win, modality_id, factor_x100, selection)
-       SELECT $1, d, s, a, w, m, f, nullif(sel, '')::smallint[]
-         FROM unnest($2::uuid[], $3::uuid[], $4::bigint[], $5::bigint[], $6::uuid[], $7::bigint[], $8::text[]) AS t(d, s, a, w, m, f, sel)`,
+      `INSERT INTO lottery.play (ticket_id, draw_id, symbol_id, amount, potential_win, modality_id, factor_x100, selection, star)
+       SELECT $1, d, s, a, w, m, f, nullif(sel, '')::smallint[], st
+         FROM unnest($2::uuid[], $3::uuid[], $4::bigint[], $5::bigint[], $6::uuid[], $7::bigint[], $8::text[], $9::smallint[])
+           AS t(d, s, a, w, m, f, sel, st)`,
       [
         ticketId,
         plays.map((p) => p.drawId),
@@ -571,6 +592,7 @@ export class LotteryService {
         plays.map((p) => p.modalityId),
         plays.map((p) => p.factor.toString()),
         plays.map((p) => (p.selection ? `{${p.selection.join(',')}}` : '')),
+        plays.map((p) => p.star ?? null),
       ],
     );
 
@@ -721,8 +743,9 @@ export class LotteryService {
     ).rows[0];
     t.plays = (
       await db.query(
-        `SELECT p.id, p.draw_id, d.draw_at, d.status AS draw_status, p.symbol_id, s.number, s.name, s.emoji, p.selection,
+        `SELECT p.id, p.draw_id, d.draw_at, d.status AS draw_status, p.symbol_id, s.number, s.name, s.emoji, p.selection, p.star,
                 CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN d.result_numbers END AS result_numbers,
+                CASE WHEN d.status IN ('RESULT_CONFIRMED', 'SETTLED') THEN d.result_star END AS result_star,
                 p.amount::text, p.potential_win::text, p.status, p.win::text,
                 m.code AS modality, m.name AS modality_name, p.factor_x100::text
            FROM lottery.play p

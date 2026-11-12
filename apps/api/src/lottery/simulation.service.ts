@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CurrencyCode, formatAmount, parseAmount } from '@loteria/domain';
+import { CurrencyCode, formatAmount, parseAmount, drawStar } from '@loteria/domain';
 import { AuditService } from '../audit/audit.service';
 import { DbService } from '../common/db.service';
 import { BusinessError, pgErrorCode } from '../common/errors';
@@ -113,7 +113,7 @@ export class SimulationService {
     const winner = await this.db.tx(async (c) => {
       const d = (
         await c.query(
-          `SELECT d.id, d.game_id, d.status, d.server_seed, d.seed_hash, d.sim_player_id, g.board, g.draw_count
+          `SELECT d.id, d.game_id, d.status, d.server_seed, d.seed_hash, d.sim_player_id, g.board, g.draw_count, g.star_max
              FROM lottery.draw d JOIN lottery.game g ON g.id = d.game_id WHERE d.id = $1 FOR UPDATE OF d`,
           [drawId],
         )
@@ -136,11 +136,11 @@ export class SimulationService {
       }
       const w = { ...symbols[idx], numbers };
       await c.query(
-        `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = $2, result_numbers = $3::smallint[], confirmed_at = now(),
+        `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = $2, result_numbers = $3::smallint[], result_star = $4, confirmed_at = now(),
                 close_at = now(), draw_at = now(),
                 result_evidence = 'Simulación · RNG provably fair (HMAC-SHA256 sobre semilla comprometida)'
           WHERE id = $1`,
-        [drawId, w.id, numbers ? `{${numbers.join(',')}}` : null],
+        [drawId, w.id, numbers ? `{${numbers.join(',')}}` : null, numbers && d.star_max ? drawStar(d.server_seed, d.id, d.star_max) : null],
       );
       await this.audit.log(c, {
         actorType: 'PLAYER',

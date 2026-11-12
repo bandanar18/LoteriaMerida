@@ -1,4 +1,5 @@
 import { applyMultiplier } from './money';
+import { fairIndex } from './fairness';
 
 /** Tabla por defecto de 38 animales (Doc. Maestro §9.2). Es dato de seed: en BD vive en lottery_symbol. */
 export const DEFAULT_ANIMALS: ReadonlyArray<{ number: string; name: string; emoji: string }> = [
@@ -83,6 +84,8 @@ export interface PlayInput {
   modalityId?: string;
   /** Kino: números elegidos (ordenados). */
   selection?: number[];
+  /** Andes 5 Estrella: estrella elegida (1–5) en las modalidades con estrella. */
+  star?: number | null;
 }
 
 export type PlayValidationError =
@@ -104,7 +107,7 @@ export function validatePlays(plays: PlayInput[], limits: PlayLimits): PlayValid
   for (let i = 0; i < plays.length; i++) {
     const p = plays[i];
     // Triple: el mismo número puede jugarse en varias modalidades del mismo sorteo (triple, terminal, última cifra).
-    const key = `${p.drawId}|${p.symbolId}|${p.modalityId ?? ""}|${p.selection?.join(",") ?? ""}`;
+    const key = `${p.drawId}|${p.symbolId}|${p.modalityId ?? ""}|${p.selection?.join(",") ?? ""}|${p.star ?? ""}`;
     if (seen.has(key)) return { code: 'DUPLICATE_PLAY', drawId: p.drawId, symbolId: p.symbolId };
     seen.add(key);
     if (p.amount < limits.minPlay) return { code: 'PLAY_BELOW_MIN', index: i };
@@ -256,7 +259,11 @@ export type ModalityCode =
   | 'MATCH4'
   | 'MATCH3'
   | 'REVERSED'
-  | 'PARITY';
+  | 'PARITY'
+  | 'BOX'
+  | 'MATCH5S'
+  | 'MATCH4S'
+  | 'MATCH3S';
 export type ModalityStatus = 'ACTIVE' | 'PENDING_APPROVAL' | 'INACTIVE';
 
 export interface ModalityRule {
@@ -400,8 +407,11 @@ export function prizeFactor(code: ModalityCode, played: string, result: string, 
 export function playMatches(code: ModalityCode, played: string, result: string): boolean {
   if (code === 'NUMBER') return condorParts(played).number === condorParts(result).number;
   if (code === 'COLOR') return condorParts(played).color === condorParts(result).color;
-  // Dupleta de Montaña: la invertida gana si sale la pareja al revés.
+  // Dupleta de Montaña: la invertida gana si sale la pareja al revés; doble paridad, si los dos salen de la paridad apostada.
   if (code === 'REVERSED') return reversePair(played) === result;
+  if (code === 'PARITY') return pairParity(result) === pairParity(played);
+  // Cuatrifecta «Terminal 4 cifras»: las mismas cuatro cifras, en cualquier orden.
+  if (code === 'BOX') return sortDigits(played) === sortDigits(result);
   // Centena Andina «Par andino»: las dos últimas cifras en cualquier orden (90 gana con …90 y con …09).
   if (code === 'PAIR') return pairKeys(played).includes(result.slice(-2));
   const k = matchDigits(code);
@@ -412,6 +422,7 @@ export function playMatches(code: ModalityCode, played: string, result: string):
 export function playedKey(code: ModalityCode, played: string): string {
   if (code === 'FULL') return played;
   if (code === 'NUMBER') return condorParts(played).number;
+  if (code === 'PARITY') return pairParity(played) === 'EVEN' ? 'Ambos pares' : 'Ambos impares';
   if (code === 'COLOR') return condorColor(condorParts(played).color)?.name ?? played;
   // Cóndor Dorado número + color: «67 Rojo».
   const condor = condorColor(condorParts(played).color);
@@ -496,19 +507,32 @@ export const KINO_NUMBERS: ReadonlyArray<{ number: string; name: string; emoji: 
 
 /** Cuántos números lleva cada modalidad Kino (null si no es Kino). */
 export function kinoSize(code: ModalityCode): number | null {
-  if (code === 'MATCH5' || code === 'MATCH4' || code === 'MATCH3') return 5; // Andes 5 Estrella: siempre se eligen 5
+  if (/^MATCH[345]S?$/.test(code)) return 5; // Andes 5 Estrella: siempre se eligen 5 (con o sin estrella)
   return code === 'KINO5' ? 5 : code === 'KINO6' ? 6 : code === 'KINO7' ? 7 : null;
 }
 
 /** Andes 5 Estrella: cuántos aciertos EXACTOS pide la modalidad (5, 4 o 3). null en Kino, donde deben salir todos. */
 export function pickHits(code: ModalityCode): number | null {
-  return code === 'MATCH5' ? 5 : code === 'MATCH4' ? 4 : code === 'MATCH3' ? 3 : null;
+  const m = /^MATCH([345])S?$/.exec(code);
+  return m ? Number(m[1]) : null;
 }
 
-/** ¿Gana la selección? Kino: salen todos los elegidos. Andes 5 Estrella: coinciden exactamente k de los 5. */
-export function pickWins(code: ModalityCode, selection: number[], drawn: number[]): boolean {
+/** Andes 5 Estrella: estrellas posibles (1 a 5). El manual no fija el rango; se toma el de sus ejemplos. */
+export const ANDES_STAR_MAX = 5;
+
+/** ¿La modalidad lleva estrella? (5, 4 o 3 aciertos + estrella). */
+export function hasStar(code: ModalityCode): boolean {
+  return /^MATCH[345]S$/.test(code);
+}
+
+/**
+ * ¿Gana la selección? Kino: salen todos los elegidos. Andes 5 Estrella: coinciden exactamente k de los 5 y, en las
+ * modalidades con estrella, además la estrella elegida es la que salió.
+ */
+export function pickWins(code: ModalityCode, selection: number[], drawn: number[], star?: number | null, drawnStar?: number | null): boolean {
   const k = pickHits(code);
   if (k === null) return kinoWins(selection, drawn);
+  if (hasStar(code) && (star == null || star !== drawnStar)) return false;
   const set = new Set(drawn);
   return selection.filter((x) => set.has(x)).length === k;
 }
@@ -565,6 +589,7 @@ export class TerminalPayouts {
    */
   static affected(code: ModalityCode, played: string): string[] {
     if (code === 'DUAL') return [played, ...TerminalPayouts.affected('APPROX', played)];
+    if (code === 'BOX') return digitPermutations(played);
     if (code !== 'APPROX') return [played];
     const width = played.length;
     const n = Number(played);
@@ -681,7 +706,8 @@ export function pickWinProbability(code: ModalityCode, drawn: number, n = KINO_U
   const k = kinoSize(code);
   if (k === null) return 0;
   const h = pickHits(code) ?? k;
-  return (choose(k, h) * choose(n - k, drawn - h)) / choose(n, drawn);
+  const star = hasStar(code) ? 1 / ANDES_STAR_MAX : 1;
+  return ((choose(k, h) * choose(n - k, drawn - h)) / choose(n, drawn)) * star;
 }
 
 /** Cuántas selecciones distintas pueden ganar a la vez en un sorteo (acota el peor resultado). */
@@ -718,6 +744,7 @@ export class DupletaPayouts {
   private byResult = new Map<string, bigint>();
 
   static affected(code: ModalityCode, played: string): string[] {
+    if (code === 'PARITY') return DUPLETA_SYMBOLS.filter((s) => pairParity(s.number) === pairParity(played)).map((s) => s.number);
     return code === 'REVERSED' ? [reversePair(played)] : [played];
   }
 
@@ -729,4 +756,38 @@ export class DupletaPayouts {
   payout(result: string): bigint {
     return this.byResult.get(result) ?? 0n;
   }
+}
+
+// ───────────── Ayudas de las modalidades completadas ─────────────
+
+/** Cifras ordenadas: «2581» → «1258». Dos números son el mismo «en desorden» si coinciden. */
+export function sortDigits(n: string): string {
+  return n.split('').sort().join('');
+}
+
+/** Todos los órdenes distintos de las cifras de un número («1123» → 12 números). */
+export function digitPermutations(n: string): string[] {
+  const out = new Set<string>();
+  const walk = (rest: string, acc: string) => {
+    if (!rest) return void out.add(acc);
+    for (let i = 0; i < rest.length; i++) walk(rest.slice(0, i) + rest.slice(i + 1), acc + rest[i]);
+  };
+  walk(n, '');
+  return [...out].sort();
+}
+
+/** Paridad de una dupleta: «EVEN» si ambos números son pares, «ODD» si ambos impares, «MIXED» si no. */
+export function pairParity(pair: string): 'EVEN' | 'ODD' | 'MIXED' {
+  const [a, b] = pair.split('-').map(Number);
+  if (a % 2 === 0 && b % 2 === 0) return 'EVEN';
+  if (a % 2 === 1 && b % 2 === 1) return 'ODD';
+  return 'MIXED';
+}
+
+/** Dupleta que representa cada apuesta de paridad (el símbolo de la jugada): ambos pares «00-02», ambos impares «01-03». */
+export const PARITY_SYMBOL = { EVEN: '00-02', ODD: '01-03' } as const;
+
+/** Estrella del sorteo de Andes 5 Estrella: HMAC de la misma semilla con otro mensaje, 1 a ANDES_STAR_MAX. Verificable. */
+export function drawStar(serverSeedHex: string, drawId: string, max = ANDES_STAR_MAX): number {
+  return fairIndex(serverSeedHex, `${drawId}#estrella`, max) + 1;
 }

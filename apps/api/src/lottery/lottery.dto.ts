@@ -25,7 +25,9 @@ export class PlayDto {
   @ValidateIf((p) => !p.numbers) @IsUUID() symbolId?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsInt({ each: true }) @Min(1, { each: true }) @Max(99, { each: true }) numbers?: number[];
   @Matches(/^\d{1,15}([.,]\d{1,6})?$/, { message: 'Monto inválido' }) amount: string;
-  @IsOptional() @IsIn(['EXACT', 'COMBINADA', 'MULTIPLE', 'TERMINAL', 'LAST_DIGIT', 'FULL', 'KINO5', 'KINO6', 'KINO7', 'APPROX', 'SUPER', 'DUAL', 'NUMBER', 'COLOR', 'PAIR', 'MATCH5', 'MATCH4', 'MATCH3', 'REVERSED', 'PARITY']) modality?: ModalityCode;
+  /** Andes 5 Estrella: estrella elegida en las modalidades con estrella. */
+  @IsOptional() @IsInt() @Min(1) @Max(9) star?: number;
+  @IsOptional() @IsIn(['EXACT', 'COMBINADA', 'MULTIPLE', 'TERMINAL', 'LAST_DIGIT', 'FULL', 'KINO5', 'KINO6', 'KINO7', 'APPROX', 'SUPER', 'DUAL', 'NUMBER', 'COLOR', 'PAIR', 'MATCH5', 'MATCH4', 'MATCH3', 'REVERSED', 'PARITY', 'BOX', 'MATCH5S', 'MATCH4S', 'MATCH3S']) modality?: ModalityCode;
 }
 
 export class BuyTicketDto {
@@ -43,6 +45,8 @@ export class ProposeResultDto {
   // Kino: los números extraídos, en orden de extracción.
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsInt({ each: true }) @Min(1, { each: true }) @Max(99, { each: true }) numbers?: number[];
   @IsString() @Length(3, 500) evidence: string;
+  /** Andes 5 Estrella: estrella extraída. */
+  @IsOptional() @IsInt() @Min(1) @Max(9) star?: number;
 }
 
 export class CancelDrawDto {

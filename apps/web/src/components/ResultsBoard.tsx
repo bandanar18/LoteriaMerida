@@ -17,9 +17,9 @@ export function longDate(date: string) {
 
 /** Resultado visible de un sorteo: oficial o, si el juego lo publica, preliminar. */
 export function shownResult(d: Draw) {
-  if (d.result_number) return { number: d.result_number, name: d.result_name!, emoji: d.result_emoji, numbers: d.result_numbers ?? null, official: true };
+  if (d.result_number) return { number: d.result_number, name: d.result_name!, emoji: d.result_emoji, numbers: d.result_numbers ?? null, star: d.result_star ?? null, official: true };
   if (d.preliminary_number)
-    return { number: d.preliminary_number, name: d.preliminary_name!, emoji: d.preliminary_emoji, numbers: d.preliminary_numbers ?? null, official: false };
+    return { number: d.preliminary_number, name: d.preliminary_name!, emoji: d.preliminary_emoji, numbers: d.preliminary_numbers ?? null, star: null, official: false };
   return null;
 }
 
@@ -57,7 +57,7 @@ export function LatestAndNext({ latest, next, now }: { latest?: Draw; next?: Dra
         <div className="text-[10px] font-bold tracking-wider text-white/70 uppercase">Último sorteo</div>
         {r && latest ? (
           <div className="mt-1 flex items-center gap-2">
-            <SymbolArt className="text-4xl leading-none sm:text-5xl" emoji={r.emoji} number={r.number} numbers={r.numbers} />
+            <SymbolArt className="text-4xl leading-none sm:text-5xl" emoji={r.emoji} number={r.number} numbers={r.numbers} star={r.star} />
             <div className="min-w-0">
               {r.emoji && <div className="text-2xl leading-none font-extrabold text-oro-300 tabular-nums">{r.number}</div>}
               <div className="truncate text-sm font-semibold">{symbolName(r.number, r.name) || (r.emoji ? r.number : '')}</div>
@@ -115,7 +115,7 @@ export function DayGrid({ draws, latestId, nextId, onVerify }: { draws: Draw[]; 
             {isLatest && <span className="absolute -top-2 right-1 rounded-full bg-oro-500 px-1.5 text-[9px] font-extrabold text-selva-950">ÚLTIMO</span>}
             {r ? (
               <>
-                <div className={`mt-1 text-4xl leading-none ${r.official ? '' : 'opacity-70'}`}><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
+                <div className={`mt-1 text-4xl leading-none ${r.official ? '' : 'opacity-70'}`}><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} star={r.star} /></div>
                 {r.emoji && <div className="mt-1 text-lg leading-none font-extrabold text-selva-900 tabular-nums">{r.number}</div>}
                 <div className="line-clamp-1 w-full text-[11px] text-black/60">{symbolName(r.number, r.name)}</div>
                 {!r.official && <div className="mt-0.5 text-[9px] font-semibold text-orange-700">preliminar</div>}
@@ -175,7 +175,7 @@ export function RecentStrip({ game }: { game: Game }) {
               }`}
             >
               <div className={`text-xs font-semibold tabular-nums ${last ? 'text-lima-400' : 'text-black/50'}`}>{hour(d.draw_at).replace(':00', '')}</div>
-              <div className="my-0.5 text-[2.1rem] leading-tight"><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} /></div>
+              <div className="my-0.5 text-[2.1rem] leading-tight"><SymbolArt emoji={r.emoji} number={r.number} numbers={r.numbers} star={r.star} /></div>
               {r.emoji && <div className={`text-base font-extrabold tabular-nums ${last ? 'text-oro-300' : 'text-selva-900'}`}>{r.number}</div>}
               <div className={`text-[11px] ${last ? 'text-white/60' : 'text-black/40'}`}>{isToday ? 'hoy' : 'ayer'}</div>
             </div>

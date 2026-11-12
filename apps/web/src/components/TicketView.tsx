@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { post } from '../lib/api';
 import { Currency, dateTime, DRAW_STATUS_LABEL, hour, money, TICKET_STATUS_LABEL } from '../lib/format';
 import { ErrorBox, StatusBadge } from './ui';
-import { NumberBalls, SymbolArt } from './SymbolArt';
+import { NumberBalls, StarBadge, SymbolArt } from './SymbolArt';
 import { playedLabel } from '../lib/queries';
 
 export function TicketView({ ticket, onChange }: { ticket: any; onChange?: (t: any) => void }) {
@@ -59,6 +59,7 @@ export function TicketView({ ticket, onChange }: { ticket: any; onChange?: (t: a
                   {p.selection ? (
                     <span className="flex flex-wrap items-center gap-1">
                       {p.modality_name} <NumberBalls numbers={p.selection} hits={p.result_numbers} />
+                      {p.star && <StarBadge n={p.star} hit={p.result_star == null ? null : p.result_star === p.star} />}
                     </span>
                   ) : p.emoji ? <>{p.number} {p.name}</> : <>{p.modality_name} {playedLabel(p.modality, p.number)}</>}
                 </div>

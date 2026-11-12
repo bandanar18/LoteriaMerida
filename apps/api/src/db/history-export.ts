@@ -22,7 +22,7 @@ async function main() {
   try {
     const { rows } = await pool.query(
       `SELECT d.id, g.code AS game, d.draw_at, d.sales_open_at, d.close_at, d.status, d.is_extraordinary, d.auto_rng,
-              d.seed_hash, d.server_seed, s.number AS result, d.result_numbers, d.result_evidence, d.cancelled_reason,
+              d.seed_hash, d.server_seed, s.number AS result, d.result_numbers, d.result_star, d.result_evidence, d.cancelled_reason,
               d.confirmed_at, d.settled_at
          FROM lottery.draw d
          JOIN lottery.game g ON g.id = d.game_id

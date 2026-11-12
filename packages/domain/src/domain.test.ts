@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkModality,
+  digitPermutations,
+  pairParity,
+  PARITY_SYMBOL,
+  drawStar,
+  hasStar,
   DUPLETA_SYMBOLS,
   DupletaPayouts,
   CUATRIFECTA_NUMBERS,
@@ -532,5 +537,38 @@ describe('Dupleta de Montaña (MER-07)', () => {
     const p = new DupletaPayouts().add('EXACT', '25-52', 1500n).add('REVERSED', '52-25', 750n);
     expect(p.payout('25-52')).toBe(2250n);
     expect(affectedResults('DUO', 'REVERSED', '25-52')).toEqual(['52-25']);
+  });
+});
+
+describe('Modalidades completadas', () => {
+  it('Cuatrifecta «Terminal 4 cifras»: las cuatro cifras en cualquier orden', () => {
+    expect(prizeFactor('BOX', '1234', '4321', 30000n)).toBe(30000n);
+    expect(prizeFactor('BOX', '1234', '1235', 30000n)).toBe(0n);
+    expect(digitPermutations('1234')).toHaveLength(24);
+    expect(digitPermutations('1123')).toHaveLength(12);
+    expect(digitPermutations('7777')).toEqual(['7777']);
+    expect(affectedResults('DIGITS4', 'BOX', '1123')).toHaveLength(12);
+  });
+  it('Dupleta «Doble paridad»: ambos pares o ambos impares', () => {
+    expect(pairParity('24-86')).toBe('EVEN');
+    expect(pairParity('25-53')).toBe('ODD');
+    expect(pairParity('25-52')).toBe('MIXED');
+    expect(prizeFactor('PARITY', PARITY_SYMBOL.EVEN, '24-86', 300n)).toBe(300n);
+    expect(prizeFactor('PARITY', PARITY_SYMBOL.EVEN, '25-52', 300n)).toBe(0n);
+    expect(prizeFactor('PARITY', PARITY_SYMBOL.ODD, '25-53', 300n)).toBe(300n);
+    expect(affectedResults('DUO', 'PARITY', PARITY_SYMBOL.EVEN)).toHaveLength(2450);
+    expect(playedKey('PARITY', PARITY_SYMBOL.ODD)).toBe('Ambos impares');
+  });
+  it('Andes 5 Estrella con estrella: además debe acertar la estrella; RTP igual que sin ella', () => {
+    const drawn = [3, 12, 21, 34, 40];
+    expect(hasStar('MATCH5S')).toBe(true);
+    expect(pickWins('MATCH5S', drawn, drawn, 5, 5)).toBe(true);
+    expect(pickWins('MATCH5S', drawn, drawn, 4, 5)).toBe(false);
+    expect(pickWins('MATCH4S', [3, 12, 21, 34, 38], drawn, 2, 2)).toBe(true);
+    expect(pickWinProbability('MATCH4S', 5) * 5).toBeCloseTo(pickWinProbability('MATCH4', 5));
+    const s = drawStar('00'.repeat(32), 'draw-1');
+    expect(s).toBeGreaterThanOrEqual(1);
+    expect(s).toBeLessThanOrEqual(5);
+    expect(drawStar('00'.repeat(32), 'draw-1')).toBe(s);
   });
 });

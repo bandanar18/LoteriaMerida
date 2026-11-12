@@ -126,6 +126,10 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
   const kinoNumbers = kinoText.split(/[^0-9]+/).filter(Boolean).map(Number);
   const kinoOk =
     kinoNumbers.length === game.draw_count && new Set(kinoNumbers).size === kinoNumbers.length && kinoNumbers.every((n) => n >= 1 && n <= game.symbol_count);
+  // Andes 5 Estrella: también se carga la estrella extraída.
+  const [starText, setStarText] = useState('');
+  const starNum = Number(starText);
+  const starOk = !game.star_max || (Number.isInteger(starNum) && starNum >= 1 && starNum <= game.star_max);
   const [evidence, setEvidence] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const exposure = useQuery({
@@ -174,6 +178,15 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
                 value={kinoText}
                 onChange={(e) => setKinoText(e.target.value)}
               />
+              {!!game.star_max && (
+                <input
+                  className="input w-40"
+                  inputMode="numeric"
+                  placeholder={`Estrella (1 a ${game.star_max})`}
+                  value={starText}
+                  onChange={(e) => setStarText(e.target.value.replace(/[^0-9]/g, ''))}
+                />
+              )}
               {kinoNumbers.length > 0 && (
                 <div className="flex items-center gap-2 text-xs">
                   <NumberBalls numbers={kinoNumbers} />
@@ -194,8 +207,8 @@ function DrawPanel({ draw, game }: { draw: any; game: Game }) {
           </select>
           )}
           <input className="input" placeholder="Evidencia (URL del resultado oficial, nº de acta…)" value={evidence} onChange={(e) => setEvidence(e.target.value)} />
-          <button className="btn-primary w-full" disabled={(isKino ? !kinoOk : !symbolId) || evidence.length < 3 || action.isPending}
-            onClick={() => action.mutate({ path: 'propose-result', body: isKino ? { numbers: kinoNumbers, evidence } : { symbolId, evidence } })}>
+          <button className="btn-primary w-full" disabled={(isKino ? !kinoOk || !starOk : !symbolId) || evidence.length < 3 || action.isPending}
+            onClick={() => action.mutate({ path: 'propose-result', body: isKino ? { numbers: kinoNumbers, evidence, ...(game.star_max ? { star: starNum } : {}) } : { symbolId, evidence } })}>
             Proponer resultado
           </button>
         </div>

@@ -5,7 +5,7 @@ import { TicketView } from '../components/TicketView';
 import { Empty, Modal, PageTitle, Spinner, StatusBadge } from '../components/ui';
 import { get } from '../lib/api';
 import { Currency, dateTime, money, TICKET_STATUS_LABEL } from '../lib/format';
-import { NumberBalls, SymbolArt } from '../components/SymbolArt';
+import { NumberBalls, StarBadge, SymbolArt } from '../components/SymbolArt';
 import { playedLabel } from '../lib/queries';
 
 export function TicketsPage() {
@@ -45,7 +45,12 @@ function LotteryTickets() {
             <div className="mt-2 flex flex-wrap gap-1 text-xl">
               {t.plays.slice(0, 10).map((p: any) => (
                 <span key={p.id} title={p.emoji ? `${p.number} ${p.name}` : `${p.modality_name} ${playedLabel(p.modality, p.number)}`} className={p.status === 'WON' ? 'rounded bg-oro-300' : ''}>
-                  {p.selection ? <NumberBalls numbers={p.selection} /> : <SymbolArt emoji={p.emoji} number={playedLabel(p.modality, p.number)} />}
+                  {p.selection ? (
+                    <span className="inline-flex items-center gap-1">
+                      <NumberBalls numbers={p.selection} />
+                      {p.star && <StarBadge n={p.star} />}
+                    </span>
+                  ) : <SymbolArt emoji={p.emoji} number={playedLabel(p.modality, p.number)} />}
                 </span>
               ))}
               {t.plays.length > 10 && <span className="text-sm text-black/40">+{t.plays.length - 10}</span>}

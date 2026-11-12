@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import { aggregateTicketStatus, applyMultiplier, assertTransition, CurrencyCode, DrawStatus, KYC_MAX_FILE_BYTES, pickWins, prizeFactor, PlayStatus, sniffMime } from '@loteria/domain';
+import { aggregateTicketStatus, applyMultiplier, assertTransition, CurrencyCode, DrawStatus, KYC_MAX_FILE_BYTES, drawStar, pickWins, prizeFactor, PlayStatus, sniffMime } from '@loteria/domain';
 import { AuditService } from '../audit/audit.service';
 import { Db, DbService } from '../common/db.service';
 import { BusinessError, pgErrorCode } from '../common/errors';
@@ -176,7 +176,7 @@ export class DrawLifecycleService {
   private async lockDraw(c: Db, drawId: string) {
     const d = (
       await c.query(
-        `SELECT d.*, g.result_source, g.requires_record, g.board, g.draw_count, d.draw_at <= now() AS due,
+        `SELECT d.*, g.result_source, g.requires_record, g.board, g.draw_count, g.star_max, d.draw_at <= now() AS due,
                 EXISTS (SELECT 1 FROM lottery.draw_record r WHERE r.draw_id = d.id) AS has_record
            FROM lottery.draw d JOIN lottery.game g ON g.id = d.game_id WHERE d.id = $1 FOR UPDATE OF d`,
         [drawId],
@@ -205,10 +205,12 @@ export class DrawLifecycleService {
         // Kino: 7 números distintos en orden de extracción.
         const idxs = await this.rng.sampleFromCommitment(c, { consumer: 'lottery.draw', refId: d.id, serverSeed: d.server_seed, n: symbols.length, k: d.draw_count });
         const numbers = idxs.map((i) => Number(symbols[i].number));
+        // Andes 5 Estrella: estrella de la misma semilla comprometida (verificable).
+        const star = d.star_max ? drawStar(d.server_seed, d.id, d.star_max) : null;
         await c.query(
-          `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = $2, result_numbers = $3::smallint[], confirmed_at = now(),
-                  result_evidence = $4 WHERE id = $1`,
-          [drawId, symbols[idxs[0]].id, `{${numbers.join(',')}}`, 'Sorteo automático · RNG provably fair (HMAC-SHA256, extracción sin reposición)'],
+          `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = $2, result_numbers = $3::smallint[], result_star = $5,
+                  confirmed_at = now(), result_evidence = $4 WHERE id = $1`,
+          [drawId, symbols[idxs[0]].id, `{${numbers.join(',')}}`, 'Sorteo automático · RNG provably fair (HMAC-SHA256, extracción sin reposición)', star],
         );
         await this.audit.log(c, {
           actorType: 'SYSTEM',
@@ -252,7 +254,7 @@ export class DrawLifecycleService {
   }
 
   /** Paso 1 de 2 (4 ojos): un operador propone el resultado oficial con evidencia. */
-  async proposeResult(drawId: string, symbolId: string | undefined, evidence: string, actor: Actor, numbers?: number[]) {
+  async proposeResult(drawId: string, symbolId: string | undefined, evidence: string, actor: Actor, numbers?: number[], star?: number) {
     return this.db.tx(async (c) => {
       const d = await this.lockDraw(c, drawId);
       if (d.result_source === 'INTERNAL_RNG' || d.auto_rng) throw new BusinessError('INVALID_STATE', 'Este sorteo se sortea por RNG');
@@ -274,14 +276,17 @@ export class DrawLifecycleService {
         ])).rows[0].n;
         if (!s || valid !== k) throw new BusinessError('INVALID_INPUT', 'Hay números fuera del 01 al 40');
         kinoNumbers = numbers;
+        if (d.star_max && (!Number.isInteger(star) || star! < 1 || star! > d.star_max)) {
+          throw new BusinessError('INVALID_INPUT', `Carga la estrella extraída (1 a ${d.star_max})`);
+        }
       } else {
         s = (await c.query(`SELECT id, number, name FROM lottery.symbol WHERE id = $1 AND game_id = $2`, [symbolId, d.game_id])).rows[0];
         if (!s) throw new BusinessError('INVALID_INPUT', 'Resultado inválido para este juego');
       }
       await c.query(
         `UPDATE lottery.draw SET status = 'RESULT_PENDING', proposed_symbol_id = $2, proposed_by = $3, proposed_at = now(),
-                result_evidence = $4, proposed_numbers = $5::smallint[] WHERE id = $1`,
-        [drawId, s.id, actor.id, evidence, kinoNumbers ? `{${kinoNumbers.join(',')}}` : null],
+                result_evidence = $4, proposed_numbers = $5::smallint[], proposed_star = $6 WHERE id = $1`,
+        [drawId, s.id, actor.id, evidence, kinoNumbers ? `{${kinoNumbers.join(',')}}` : null, d.star_max ? star : null],
       );
       await this.audit.log(c, {
         actorType: 'STAFF',
@@ -311,7 +316,7 @@ export class DrawLifecycleService {
         throw new BusinessError('RECORD_REQUIRED', 'Registra el acta del sorteo antes de confirmar el resultado oficial');
       }
       await c.query(
-        `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = proposed_symbol_id, result_numbers = proposed_numbers,
+        `UPDATE lottery.draw SET status = 'RESULT_CONFIRMED', result_symbol_id = proposed_symbol_id, result_numbers = proposed_numbers, result_star = proposed_star,
                 confirmed_by = $2, confirmed_at = now() WHERE id = $1`,
         [drawId, actor.id],
       );
@@ -335,7 +340,7 @@ export class DrawLifecycleService {
       const d = await this.lockDraw(c, drawId);
       this.transition(d.status, 'CLOSED');
       await c.query(
-        `UPDATE lottery.draw SET status = 'CLOSED', proposed_symbol_id = NULL, proposed_numbers = NULL, proposed_by = NULL, proposed_at = NULL,
+        `UPDATE lottery.draw SET status = 'CLOSED', proposed_symbol_id = NULL, proposed_numbers = NULL, proposed_star = NULL, proposed_by = NULL, proposed_at = NULL,
                 result_evidence = NULL WHERE id = $1`,
         [drawId],
       );
@@ -361,7 +366,7 @@ export class DrawLifecycleService {
       if (d.status !== 'RESULT_CONFIRMED') return { settled: 0 };
       const plays = (
         await c.query(
-          `SELECT p.id, p.ticket_id, p.symbol_id, p.amount, p.factor_x100, t.player_id, t.currency, m.code AS modality, s.number, p.selection
+          `SELECT p.id, p.ticket_id, p.symbol_id, p.amount, p.factor_x100, t.player_id, t.currency, m.code AS modality, s.number, p.selection, p.star
              FROM lottery.play p JOIN lottery.ticket t ON t.id = p.ticket_id
              JOIN lottery.modality m ON m.id = p.modality_id JOIN lottery.symbol s ON s.id = p.symbol_id
             WHERE p.draw_id = $1 AND p.status = 'OPEN' ORDER BY p.id FOR UPDATE OF p`,
@@ -380,7 +385,7 @@ export class DrawLifecycleService {
         // Animalitos/Frutas: mismo símbolo. Triple: coinciden 3, 2 o 1 cifras finales según la modalidad.
         // Kino: gana si todos sus números están entre los extraídos.
         const f = p.selection
-          ? pickWins(p.modality, p.selection, d.result_numbers ?? []) ? BigInt(p.factor_x100) : 0n
+          ? pickWins(p.modality, p.selection, d.result_numbers ?? [], p.star, d.result_star) ? BigInt(p.factor_x100) : 0n
           : prizeFactor(p.modality, p.number, resultNumber, BigInt(p.factor_x100));
         const won = f > 0n;
         const win = won ? applyMultiplier(amount, f) : 0n;

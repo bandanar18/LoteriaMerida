@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { AuditService } from '../audit/audit.service';
 import { config } from '../config';
+import { drawStar } from '@loteria/domain';
 import { RngService } from '../rng/rng.service';
 
 /**
@@ -44,7 +45,7 @@ async function main() {
   try {
     await client.query('BEGIN');
     const games = (
-      await client.query(`SELECT id, code, timezone, close_minutes_before, board, draw_count FROM lottery.game WHERE status = 'ACTIVE' ORDER BY display_order`)
+      await client.query(`SELECT id, code, timezone, close_minutes_before, board, draw_count, star_max FROM lottery.game WHERE status = 'ACTIVE' ORDER BY display_order`)
     ).rows;
     for (const g of games) {
       const symbols = (await client.query(`SELECT id, number, name FROM lottery.symbol WHERE game_id = $1 ORDER BY sort`, [g.id])).rows;
@@ -111,6 +112,7 @@ async function main() {
       async function resolve(drawId: string, serverSeed: string) {
         let symbolId: string;
         let numbers: number[] | null = null;
+        let star: number | null = null;
         let label: string;
         if (g.board === 'KINO') {
           // Kino: 7 números distintos en orden de extracción, como en el sorteo real.
@@ -120,17 +122,21 @@ async function main() {
           numbers = idxs.map((i) => Number(symbols[i].number));
           symbolId = symbols[idxs[0]].id;
           label = numbers.map((x) => String(x).padStart(2, '0')).join('-');
+          if (g.star_max) {
+            star = drawStar(serverSeed, drawId, g.star_max);
+            label += ` ⭐${star}`;
+          }
         } else {
           const idx = await rng.fromCommitment(client, { consumer: 'lottery.draw', refId: drawId, serverSeed, n: symbols.length });
           symbolId = symbols[idx].id;
           label = `${symbols[idx].number} ${symbols[idx].name}`;
         }
         await client.query(
-          `UPDATE lottery.draw SET status = 'SETTLED', result_symbol_id = $2, result_numbers = $3::smallint[], auto_rng = true,
+          `UPDATE lottery.draw SET status = 'SETTLED', result_symbol_id = $2, result_numbers = $3::smallint[], result_star = $4, auto_rng = true,
                   confirmed_at = draw_at, settled_at = draw_at, close_at = least(close_at, draw_at),
                   result_evidence = 'Historial de muestra (DEMO) · RNG provably fair'
             WHERE id = $1`,
-          [drawId, symbolId, numbers ? `{${numbers.join(',')}}` : null],
+          [drawId, symbolId, numbers ? `{${numbers.join(',')}}` : null, star],
         );
         await audit.log(client, {
           actorType: 'SYSTEM',

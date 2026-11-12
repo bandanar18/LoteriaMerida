@@ -308,7 +308,7 @@ export class LotteryAdminController {
   @HttpCode(200)
   @Post('draws/:id/propose-result')
   propose(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ProposeResultDto, @CurrentUser() u: AuthUser, @ClientIp() ip: string) {
-    return this.lifecycle.proposeResult(id, dto.symbolId, dto.evidence, { id: u.id, ip }, dto.numbers);
+    return this.lifecycle.proposeResult(id, dto.symbolId, dto.evidence, { id: u.id, ip }, dto.numbers, dto.star);
   }
 
   @Roles('LOTTERY_OPERATOR')

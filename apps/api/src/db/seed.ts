@@ -13,7 +13,7 @@ import { seedSports } from './seed-sports';
  */
 type Limits = Record<'VES' | 'USDT', { min: string; max: string; ticket: string; liability: string; perDraw?: string }>;
 type SeedModality = {
-  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL' | 'NUMBER' | 'COLOR' | 'PAIR' | 'MATCH5' | 'MATCH4' | 'MATCH3' | 'REVERSED' | 'PARITY';
+  code: 'EXACT' | 'COMBINADA' | 'MULTIPLE' | 'TERMINAL' | 'LAST_DIGIT' | 'FULL' | 'KINO5' | 'KINO6' | 'KINO7' | 'APPROX' | 'SUPER' | 'DUAL' | 'NUMBER' | 'COLOR' | 'PAIR' | 'MATCH5' | 'MATCH4' | 'MATCH3' | 'REVERSED' | 'PARITY' | 'BOX' | 'MATCH5S' | 'MATCH4S' | 'MATCH3S';
   name: string;
   min: number;
   max: number | null;
@@ -78,8 +78,8 @@ const CONDOR_MODALITIES: SeedModality[] = [
 // vienen de la infografía (FUR); el manual las da «por precisar» (Anexo B.1) y pide no activarlas hasta definirlas.
 const CENTENA_MODALITIES: SeedModality[] = [
   { code: 'EXACT', name: 'Centena exacta', min: 1, max: 1, factorX100: 20000, status: 'ACTIVE', description: 'Aciertas las tres cifras en el mismo orden (009 gana solo si sale 009). Cobras 200× lo apostado.' },
-  { code: 'TERMINAL', name: 'Aproximación', min: 1, max: 1, factorX100: 4000, status: 'PENDING_APPROVAL', description: 'Aciertas las dos últimas cifras en el mismo orden (09 gana si sale 009, 109, 209…). Cobras 40× lo apostado.' },
-  { code: 'PAIR', name: 'Par andino', min: 1, max: 1, factorX100: 2000, status: 'PENDING_APPROVAL', description: 'Aciertas las dos últimas cifras en cualquier orden (90 gana si termina en 90 o en 09). Cobras 20× lo apostado.' },
+  { code: 'TERMINAL', name: 'Aproximación', min: 1, max: 1, factorX100: 4000, status: 'ACTIVE', description: 'Aciertas las dos últimas cifras en el mismo orden (09 gana si sale 009, 109, 209…). Cobras 40× lo apostado.' },
+  { code: 'PAIR', name: 'Par andino', min: 1, max: 1, factorX100: 2000, status: 'ACTIVE', description: 'Aciertas las dos últimas cifras en cualquier orden (90 gana si termina en 90 o en 09). Cobras 20× lo apostado.' },
 ];
 
 // Manual MER-10 «Andes 5 Estrella», cláusula décima octava: 5.000× / 1.000× / 50×. Cada modalidad es una línea aparte y pide
@@ -88,14 +88,18 @@ const ANDES5_MODALITIES: SeedModality[] = [
   { code: 'MATCH5', name: '5 números exactos', min: 5, max: 5, factorX100: 500000, status: 'ACTIVE', description: 'Eliges 5 números del 01 al 40; se extraen 5. Si salen tus cinco, en cualquier orden, cobras 5.000× lo apostado.' },
   { code: 'MATCH4', name: '4 aciertos', min: 5, max: 5, factorX100: 100000, status: 'ACTIVE', description: 'Eliges 5 números; ganas si salen exactamente 4 de ellos. Cobras 1.000× lo apostado.' },
   { code: 'MATCH3', name: '3 aciertos', min: 5, max: 5, factorX100: 5000, status: 'ACTIVE', description: 'Eliges 5 números; ganas si salen exactamente 3 de ellos. Cobras 50× lo apostado.' },
+  { code: 'MATCH5S', name: '5 exactos + estrella', min: 5, max: 5, factorX100: 2500000, status: 'ACTIVE', description: 'Tus cinco números y tu estrella. Cobras 25.000× lo apostado.' },
+  { code: 'MATCH4S', name: '4 aciertos + estrella', min: 5, max: 5, factorX100: 500000, status: 'ACTIVE', description: 'Exactamente 4 de tus números y tu estrella. Cobras 5.000× lo apostado.' },
+  { code: 'MATCH3S', name: '3 aciertos + estrella', min: 5, max: 5, factorX100: 25000, status: 'ACTIVE', description: 'Exactamente 3 de tus números y tu estrella. Cobras 250× lo apostado.' },
 ];
 
 // Manual MER-08 «Cuatrifecta de Cumbres», cláusula décima octava: 2.000× / 300× / 100×.
 // Terminal 4 cifras es indistinguible de la exacta (Anexo B.1) y la aproximación no tiene definidos los extremos (B.2): pendientes.
 const CUATRIFECTA_MODALITIES: SeedModality[] = [
   { code: 'EXACT', name: 'Cuatrifecta exacta', min: 1, max: 1, factorX100: 200000, status: 'ACTIVE', description: 'Aciertas las cuatro cifras en el mismo orden (1234 gana solo si sale 1234). Cobras 2.000× lo apostado.' },
-  { code: 'SUPER', name: 'Terminal 4 cifras', min: 1, max: 1, factorX100: 30000, status: 'PENDING_APPROVAL', description: 'Pendiente de rediseño: el manual la describe igual que la cuatrifecta exacta pero con otro pago (Anexo B.1). 300× propuesto.' },
-  { code: 'APPROX', name: 'Aproximación', min: 1, max: 1, factorX100: 10000, status: 'PENDING_APPROVAL', description: 'Ganas si sale el número inmediatamente anterior o posterior al tuyo (juegas 1234: gana con 1233 o 1235). Cobras 100× lo apostado.' },
+  // Terminal 4 cifras: para distinguirla de la exacta (Anexo B.1) se define como las 4 cifras en cualquier orden.
+  { code: 'BOX', name: 'Terminal 4 cifras', min: 1, max: 1, factorX100: 30000, status: 'ACTIVE', description: 'Aciertas tus cuatro cifras en cualquier orden (1234 gana si sale 4321, 2143…). Cobras 300× lo apostado.' },
+  { code: 'APPROX', name: 'Aproximación', min: 1, max: 1, factorX100: 10000, status: 'ACTIVE', description: 'Ganas si sale el número inmediatamente anterior o posterior al tuyo (juegas 1234: gana con 1233 o 1235; 0000 y 9999 tienen un solo vecino). Cobras 100× lo apostado.' },
 ];
 
 // Manual MER-07 «Dupleta de Montaña», cláusula décima octava: 150× / 75× / 20×. Sobre 9.900 parejas, exacta e invertida
@@ -104,7 +108,8 @@ const CUATRIFECTA_MODALITIES: SeedModality[] = [
 const DUPLETA_MODALITIES: SeedModality[] = [
   { code: 'EXACT', name: 'Dupleta exacta', min: 1, max: 1, factorX100: 15000, status: 'ACTIVE', description: 'Dos números distintos del 00 al 99, en el orden en que salen (25-52 gana solo si sale primero 25 y luego 52). Cobras 150× lo apostado.' },
   { code: 'REVERSED', name: 'Dupleta invertida', min: 1, max: 1, factorX100: 7500, status: 'ACTIVE', description: 'Tus dos números salen en orden contrario (juegas 25-52: gana si sale 52-25). Cobras 75× lo apostado.' },
-  { code: 'PARITY', name: 'Doble paridad', min: 1, max: 1, factorX100: 2000, status: 'PENDING_APPROVAL', description: 'Pendiente: el manual no define cómo se apuesta a la paridad (Anexo B.2). 20× propuesto.' },
+  // Doble paridad: se apuesta a «ambos pares» o «ambos impares» (~25 % cada una); a 3× devuelve 74 % (a 20× devolvía ~495 %).
+  { code: 'PARITY', name: 'Doble paridad', min: 1, max: 1, factorX100: 300, status: 'ACTIVE', description: 'Apuestas a que los dos números salen pares, o a que salen impares. Si aciertas, cobras 3× lo apostado.' },
 ];
 
 const GAMES = [
@@ -277,6 +282,7 @@ const GAMES = [
     displayOrder: 8,
     board: 'KINO',
     drawCount: 5,
+    starMax: 5,
   },
   {
     // Manual MER-08 «Cuatrifecta de Cumbres» (propuesta 1.0, 29-10-2026). Sin autorización → demo.
@@ -346,15 +352,15 @@ async function main() {
     for (const g of GAMES) {
       const res = await client.query(
         `INSERT INTO lottery.game (code, name, result_source, payout_multiplier, close_minutes_before, license_ref, rules_version,
-                                   is_demo, requires_record, publish_preliminary, prize_expiry_days, display_order, board, draw_count, auto_rng)
+                                   is_demo, requires_record, publish_preliminary, prize_expiry_days, display_order, board, draw_count, auto_rng, star_max)
          -- auto_rng solo al crear: en la DEMO los sorteos programados publican su resultado solos; luego lo decide Configuración.
-         VALUES ($1, $2, $3, $9, 5, $4, $5, $6, $6, $6, $7, $8, $10, $11, true)
+         VALUES ($1, $2, $3, $9, 5, $4, $5, $6, $6, $6, $7, $8, $10, $11, true, $12)
          ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, license_ref = EXCLUDED.license_ref,
            rules_version = EXCLUDED.rules_version, is_demo = EXCLUDED.is_demo, requires_record = EXCLUDED.requires_record,
            publish_preliminary = EXCLUDED.publish_preliminary, prize_expiry_days = EXCLUDED.prize_expiry_days,
            display_order = EXCLUDED.display_order, board = EXCLUDED.board, draw_count = EXCLUDED.draw_count
          RETURNING id`,
-        [g.code, g.name, g.resultSource, g.license, g.rulesVersion, g.merida, g.prizeExpiryDays, g.displayOrder, g.payoutMultiplier, 'board' in g ? g.board : 'SYMBOLS', 'drawCount' in g ? g.drawCount : 1],
+        [g.code, g.name, g.resultSource, g.license, g.rulesVersion, g.merida, g.prizeExpiryDays, g.displayOrder, g.payoutMultiplier, 'board' in g ? g.board : 'SYMBOLS', 'drawCount' in g ? g.drawCount : 1, 'starMax' in g ? g.starMax : null],
       );
       const gameId = res.rows[0].id;
       // En un solo INSERT (Cuatrifecta trae 10.000 símbolos).
