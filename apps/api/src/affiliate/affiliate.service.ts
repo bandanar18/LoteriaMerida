@@ -13,13 +13,15 @@ import { AuditService } from '../audit/audit.service';
 import { Db } from '../common/db.service';
 import { BusinessError } from '../common/errors';
 import { publish } from '../common/realtime';
+import { config } from '../config';
 import { LedgerService } from '../wallet/ledger.service';
 
 export const AGENT_TERMS_VERSION = 'AGENCIAS-1.0';
 
 export interface ReferralIdentity {
-  documentType: string;
-  documentNumber: string;
+  /** null en el registro lite (documento pendiente). */
+  documentType: string | null;
+  documentNumber: string | null;
   phone: string;
 }
 
@@ -102,7 +104,7 @@ export class AffiliateService {
     if (!agent) rejected = 'CODE_INVALID';
     else if (
       agent.user_id === playerId ||
-      (agent.document_type === who.documentType && agent.document_number === who.documentNumber) ||
+      (!!who.documentNumber && agent.document_type === who.documentType && agent.document_number === who.documentNumber) ||
       agent.phone === who.phone
     ) {
       rejected = 'SELF_REFERRAL';
@@ -168,8 +170,11 @@ export class AffiliateService {
     if (!ref || ref.status !== 'ACTIVE' || ref.agent_user_id === t.playerId) return;
 
     // K6: el referido debe tener al menos un depósito aprobado (protege contra cuentas creadas solo por el bono).
-    const deposited = await c.query(`SELECT 1 FROM payments.deposit WHERE player_id = $1 AND status = 'APPROVED' LIMIT 1`, [t.playerId]);
-    if (!deposited.rows[0]) return;
+    // En la DEMO (AFFILIATE_REQUIRE_DEPOSIT=false) las jugadas con el bono de bienvenida también comisionan.
+    if (config.affiliateRequireDeposit) {
+      const deposited = await c.query(`SELECT 1 FROM payments.deposit WHERE player_id = $1 AND status = 'APPROVED' LIMIT 1`, [t.playerId]);
+      if (!deposited.rows[0]) return;
+    }
 
     const rateBps = await this.currentRate(c, 'LOTTERY', t.gameId);
     if (rateBps <= 0) return;

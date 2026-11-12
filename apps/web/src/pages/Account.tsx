@@ -35,7 +35,7 @@ export function AccountPage() {
       <PageTitle>Mi cuenta</PageTitle>
       <div className="card grid grid-cols-2 gap-3 p-4 text-sm">
         <Info label="Nombre" value={`${u.first_name} ${u.last_name}`} />
-        <Info label="Documento" value={`${u.document_type}-${u.document_number}`} />
+        <Info label="Documento" value={u.document_number ? `${u.document_type}-${u.document_number}` : "Pendiente (se pide antes de retirar)"} />
         <Info label="Correo" value={u.email} />
         <Info label="Teléfono" value={`+${u.phone}`} />
         <Info label="Ubicación" value={[u.city, u.state].filter(Boolean).join(', ') || '—'} />

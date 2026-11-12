@@ -22,6 +22,26 @@ export class RegisterDto {
   @IsOptional() @IsString() @MaxLength(20) referralCode?: string;
 }
 
+/**
+ * Registro lite (DEMO): quien llega por el QR de una agencia arma su jugada y luego se registra
+ * solo con nombre, correo, teléfono y contraseña. Documento y nacimiento se completan antes de retirar.
+ */
+export class LiteRegisterDto {
+  /** Nombre y apellido en un solo campo. */
+  @IsString() @Length(2, 120) fullName: string;
+  @IsString() @Length(7, 20) phone: string;
+  @IsEmail() @MaxLength(120) email: string;
+  @IsString()
+  @Length(10, 128)
+  @Matches(/(?=.*[a-zA-Z])(?=.*\d)/, { message: 'La contraseña debe tener letras y números' })
+  password: string;
+  @IsOptional() @IsIn(['VES', 'USDT']) currency?: 'VES' | 'USDT';
+  /** Declara ser mayor de edad y acepta que es una aplicación DEMO sin valor real. */
+  @Equals(true, { message: 'Debes declarar que eres mayor de edad y aceptar que es una aplicación DEMO' })
+  acceptTerms: boolean;
+  @IsOptional() @IsString() @MaxLength(20) referralCode?: string;
+}
+
 export class LoginDto {
   @IsEmail() email: string;
   @IsString() @Length(1, 128) password: string;

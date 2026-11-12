@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { DbService } from '../common/db.service';
 import { config } from '../config';
-import { LoginDto, RegisterDto, SelfExclusionDto } from './auth.dto';
+import { LiteRegisterDto, LoginDto, RegisterDto, SelfExclusionDto } from './auth.dto';
 import { AuthUser, ClientIp, CurrentUser, Public, Roles } from './auth.guard';
 import { AuthService } from './auth.service';
 
@@ -32,6 +32,15 @@ export class AuthController {
   @Post('auth/register')
   async register(@Body() dto: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { refreshToken, ...rest } = await this.auth.register(dto, meta(req));
+    setRefreshCookie(res, refreshToken);
+    return rest;
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('auth/register-lite')
+  async registerLite(@Body() dto: LiteRegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const { refreshToken, ...rest } = await this.auth.registerLite(dto, meta(req));
     setRefreshCookie(res, refreshToken);
     return rest;
   }
@@ -79,6 +88,12 @@ export class AuthController {
   @Get('platform')
   async platform() {
     const settings = await this.db.one<{ trading_enabled: boolean }>('SELECT trading_enabled FROM futures.settings WHERE id');
-    return { licenseLabel: config.licenseLabel, timezone: 'America/Caracas', futuresEnabled: settings?.trading_enabled === true };
+    return {
+      licenseLabel: config.licenseLabel,
+      timezone: 'America/Caracas',
+      futuresEnabled: settings?.trading_enabled === true,
+      // Bono de bienvenida DEMO (unidades mínimas): el invitado lo ve como saldo antes de registrarse.
+      signupBonus: { VES: config.signupBonus.VES.toString(), USDT: config.signupBonus.USDT.toString() },
+    };
   }
 }

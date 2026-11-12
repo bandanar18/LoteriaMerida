@@ -3,6 +3,7 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RecentStrip, useUpcomingDraws } from '../components/ResultsBoard';
 import { TicketView } from '../components/TicketView';
+import { GuestWelcome, LiteSignupForm, useGuestBalance } from '../components/GuestSignup';
 import { ErrorBox, Modal, Notice, Spinner } from '../components/ui';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -29,6 +30,7 @@ const factorLabel = (x100: string) => `${Number(BigInt(x100)) / 100}×`;
 const winFor = (amount: bigint, factorX100: string) => (amount * BigInt(factorX100)) / 100n;
 
 export function PlayPage() {
+  const { user } = useAuth();
   const games = useGames();
   const [gameId, setGameId] = useState<string>();
   const game = games.data?.find((g) => g.id === gameId) ?? games.data?.[0];
@@ -38,6 +40,7 @@ export function PlayPage() {
 
   return (
     <div className="space-y-3">
+      {!user && <GuestWelcome />}
       {games.data!.length > 1 && (
         <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
           {games.data!.map((g) => (
@@ -87,6 +90,9 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
   const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
   const [receipt, setReceipt] = useState<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Modo invitado: saldo de bienvenida y registro lite al comprar.
+  const guestBalance = useGuestBalance();
+  const [liteOpen, setLiteOpen] = useState(false);
 
   const words = symbolWords(game);
   const limits = game.limits.find((l) => l.currency === currency)!;
@@ -234,6 +240,11 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
       buying={buy.isPending}
       error={buy.error}
       user={user}
+      guestBalance={!user && guestBalance ? guestBalance[currency] : null}
+      onGuestPlay={() => {
+        setSheetOpen(false);
+        setLiteOpen(true);
+      }}
     />
   );
 
@@ -510,6 +521,15 @@ export function GameBoard({ game, sim }: { game: Game; sim?: SimMode }) {
           </Notice>
         </div>
       </Modal>
+      <Modal open={liteOpen} onClose={() => setLiteOpen(false)} title="Crea tu cuenta para jugar">
+        <LiteSignupForm
+          currency={currency}
+          onDone={() => {
+            setLiteOpen(false);
+            buy.mutate();
+          }}
+        />
+      </Modal>
       <Modal open={!!receipt} onClose={() => setReceipt(null)} title="¡Ticket comprado!">
         {receipt && <TicketView ticket={receipt} />}
       </Modal>
@@ -531,6 +551,9 @@ function TicketPanel(props: {
   buying: boolean;
   error: unknown;
   user: ReturnType<typeof useAuth>['user'];
+  /** Invitado: saldo de bienvenida en la moneda del ticket (null si hay sesión). */
+  guestBalance?: bigint | null;
+  onGuestPlay?: () => void;
 }) {
   const { cart, currency, user } = props;
   return (
@@ -586,6 +609,21 @@ function TicketPanel(props: {
           </button>
         ) : user ? (
           <Notice tone="warn">Las cuentas de staff no pueden apostar.</Notice>
+        ) : props.guestBalance != null ? (
+          <>
+            <div className="flex justify-between text-sm">
+              <span className="text-black/60">🎁 Saldo de bienvenida</span>
+              <span className="font-semibold tabular-nums">{money(props.guestBalance, currency)}</span>
+            </div>
+            {props.total > props.guestBalance && <Notice tone="warn">El ticket supera tu saldo de bienvenida.</Notice>}
+            <button
+              className="btn-gold w-full py-3 text-base"
+              disabled={cart.length === 0 || props.buying || props.total > props.guestBalance}
+              onClick={props.onGuestPlay}
+            >
+              {props.buying ? 'Procesando…' : 'Jugar'}
+            </button>
+          </>
         ) : (
           <Link to="/login" className="btn-gold w-full py-3">
             Entra para comprar

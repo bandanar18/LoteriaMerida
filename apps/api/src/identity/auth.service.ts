@@ -11,7 +11,7 @@ import { localDate } from '../common/time';
 import { config } from '../config';
 import { AffiliateService } from '../affiliate/affiliate.service';
 import { LedgerService } from '../wallet/ledger.service';
-import { RegisterDto } from './auth.dto';
+import { LiteRegisterDto, RegisterDto } from './auth.dto';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -92,6 +92,52 @@ export class AuthService {
     } catch (err) {
       if (pgErrorCode(err) === '23505') {
         throw new BusinessError('CONFLICT', 'Ya existe una cuenta con ese correo, teléfono o documento');
+      }
+      throw err;
+    }
+  }
+
+  /** Registro lite (DEMO): sin documento ni nacimiento; mismo bono de bienvenida y mismo vínculo con la agencia. */
+  async registerLite(dto: LiteRegisterDto, meta: SessionMeta) {
+    const phone = normalizeVePhone(dto.phone);
+    if (!phone) throw new BusinessError('INVALID_INPUT', 'Teléfono venezolano inválido');
+    const parts = dto.fullName.trim().replace(/\s+/g, ' ').split(' ');
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
+    if (!firstName || !lastName) throw new BusinessError('INVALID_INPUT', 'Escribe tu nombre y tu apellido');
+    const email = dto.email.trim().toLowerCase();
+    const currency = dto.currency ?? 'VES';
+
+    const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
+    try {
+      const user = await this.db.tx(async (c) => {
+        const res = await c.query(
+          `INSERT INTO identity.app_user
+             (kind, role, email, phone, first_name, last_name, password_hash, currency_default, demo_terms_accepted_at, lite_signup)
+           VALUES ('PLAYER', 'PLAYER', $1, $2, $3, $4, $5, $6, now(), true)
+           RETURNING id, role, kind`,
+          [email, phone, firstName.slice(0, 60), lastName.slice(0, 60), passwordHash, currency],
+        );
+        const u = res.rows[0];
+        await this.ledger.playerCash(c, u.id, 'VES');
+        await this.ledger.playerCash(c, u.id, 'USDT');
+        u.signup_bonus = await grantSignupBonus(c, this.ledger, this.audit, u.id);
+        u.referral = await this.affiliate.attachReferral(c, u.id, dto.referralCode, { documentType: null, documentNumber: null, phone }, meta.ip);
+        await this.audit.log(c, {
+          actorType: 'PLAYER',
+          actorId: u.id,
+          action: 'PLAYER_REGISTERED',
+          entity: 'app_user',
+          entityId: u.id,
+          after: { email, lite: true, currency, adultDeclared: true },
+          ip: meta.ip,
+        });
+        return u;
+      });
+      return { ...(await this.issueTokens(user, meta)), signupBonus: user.signup_bonus, referral: user.referral };
+    } catch (err) {
+      if (pgErrorCode(err) === '23505') {
+        throw new BusinessError('CONFLICT', 'Ya existe una cuenta con ese correo o teléfono. Entra con tu contraseña.');
       }
       throw err;
     }

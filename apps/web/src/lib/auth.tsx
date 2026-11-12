@@ -7,6 +7,8 @@ interface AuthState {
   ready: boolean;
   login: (email: string, password: string) => Promise<SessionUser>;
   register: (data: Record<string, unknown>) => Promise<SessionUser>;
+  /** Registro lite desde el modo invitado: conserva la caché (juegos y sorteos) para no perder la jugada armada. */
+  registerLite: (data: Record<string, unknown>) => Promise<SessionUser>;
   logout: () => Promise<void>;
 }
 
@@ -28,9 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const start = useCallback(
-    (s: { accessToken: string; user: SessionUser }) => {
+    (s: { accessToken: string; user: SessionUser }, keepCache = false) => {
       setAccessToken(s.accessToken);
-      qc.clear();
+      if (!keepCache) qc.clear();
       setUser(s.user);
       return s.user;
     },
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ready,
     login: async (email, password) => start(await post('/auth/login', { email, password })),
     register: async (data) => start(await post('/auth/register', data)),
+    registerLite: async (data) => start(await post('/auth/register-lite', data), true),
     logout: async () => {
       await post('/auth/logout').catch(() => undefined);
       setAccessToken(null);

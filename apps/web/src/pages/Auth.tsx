@@ -89,12 +89,21 @@ const STATES = [
   'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Yaracuy', 'Zulia',
 ];
 
-/** /r/:code — destino del QR de la Wallet de Agencias: guarda el código y lleva al registro. */
+/**
+ * /r/:code — destino del QR de la Wallet de Agencias: guarda el código y lleva directo a JUGAR.
+ * El invitado ve su saldo de bienvenida, arma la jugada y al comprar se registra (registro lite).
+ */
 export function ReferralLanding() {
   const { code = '' } = useParams();
-  const { user } = useAuth();
   storeReferral(code);
-  return <Navigate to={user ? '/' : '/registro'} replace />;
+  return <Navigate to="/" replace />;
+}
+
+/** Código guardado del QR y nombre de la agencia que invitó (si el código es válido). */
+export function useStoredReferral() {
+  const [code] = useState(() => readReferral());
+  const check = useReferralCheck(code);
+  return { code, agentName: check.state === 'valid' ? check.agentName : null };
 }
 
 type ReferralCheck = { state: 'idle' | 'checking' } | { state: 'valid'; agentName: string } | { state: 'invalid' };

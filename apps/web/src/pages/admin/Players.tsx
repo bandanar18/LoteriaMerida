@@ -65,7 +65,7 @@ export function PlayersPage() {
                       <div className="text-xs text-black/50">{p.email}</div>
                     </td>
                     <td>
-                      {p.document_type}-{p.document_number}
+                      {p.document_number ? `${p.document_type}-${p.document_number}` : "Registro lite"}
                     </td>
                     <td>+{p.phone}</td>
                     <td className="text-right text-xs tabular-nums">

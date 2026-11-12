@@ -46,6 +46,12 @@ export const config = {
    * Simulador para jugadores (recarga de saldo de prueba y sorteo privado al instante), solo en juegos demo.
    * Apagado por defecto en producción.
    */
+  /**
+   * K6 de Agencias: exigir un depósito aprobado del referido para comisionar. En la DEMO (modo simulación)
+   * viene apagado, así las jugadas con el bono de bienvenida generan comisión. AFFILIATE_REQUIRE_DEPOSIT lo fija.
+   */
+  affiliateRequireDeposit:
+    (process.env.AFFILIATE_REQUIRE_DEPOSIT ?? ((process.env.SIMULATION_MODE ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')) === 'true' ? 'false' : 'true')) === 'true',
   simulationMode: (process.env.SIMULATION_MODE ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')) === 'true',
   /** Retardo de aceptación de apuestas en vivo (Doc. Maestro §7.7). */
   liveBetDelayMs: Number(process.env.LIVE_BET_DELAY_MS ?? 5000),
