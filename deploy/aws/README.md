@@ -18,8 +18,10 @@ The temporary hostname uses the external sslip.io DNS service. Replace it with y
 Latest update: `2147c6a` (sports odds connector, new sports and the Casino section), deployed 2026-11-13 as
 `/opt/loteria/releases/20261113T225429Z-2147c6a`.
 Migrations 029 (odds feed) and 030 (basketball, ice hockey, American football) were applied; 31 migrations in total.
-No seed or history import ran. Sports stay hidden in production (`SPORTS_ENABLED=false`) and the server has no
-`ODDS_API_KEY`: the code, tables and routes are deployed but inactive until both are set in `/etc/loteria.env`.
+No seed or history import ran. Sports were enabled afterwards (2026-11-13): `/etc/loteria.env` now has
+`SPORTS_ENABLED=true` and `ODDS_API_KEY` (The Odds API, free plan of 500 credits/month; backup of the previous file in
+`/var/backups/loteria/env-before-sports-*`). The connector syncs once a day (max. 16 credits per round) and
+the first run loaded 54 real events at `/deportes`. Venezuelan leagues are not covered by the API and are loaded by hand in `/admin/deportes`.
 The previous release remains under `/opt/loteria/releases/20261113T222822Z-e926629`;
 the database, environment and document backup is in `/var/backups/loteria/20261113T225429Z-2147c6a`.
 The public site, Casino route, lottery API and services were verified; the 10 users were preserved.
