@@ -15,16 +15,14 @@ Deployment created in `us-east-1`:
 
 The temporary hostname uses the external sslip.io DNS service. Replace it with your own domain when available.
 
-Latest update: base `e926629` plus the local Casino feature, deployed 2026-11-13 as
-`/opt/loteria/releases/20261113T222822Z-e926629`. The release manifest is `deploy/aws/release.json`.
-Casino is available at `/casino` and embeds six external GameMonetize games using provider demo chips;
-it does not send wallet or authentication information to the provider. See `docs/casino-providers.md`.
-All 29 migration files were already applied. No seed or history import ran during this update.
-The previous release remains under `/opt/loteria/releases/20261113T214249Z-e926629`;
-the database, environment and document backup is in `/var/backups/loteria/20261113T222822Z-e926629`.
-All 27 public HTML, JS, CSS, image and document files, Casino routes, the ten-game API and WebSockets were verified.
-The administrator identity and password hash matched before and after deployment; the 10 users and 14 tickets were preserved.
-No game settings, limits or schedules were changed by this update.
+Latest update: `2147c6a` (sports odds connector, new sports and the Casino section), deployed 2026-11-13 as
+`/opt/loteria/releases/20261113T225429Z-2147c6a`.
+Migrations 029 (odds feed) and 030 (basketball, ice hockey, American football) were applied; 31 migrations in total.
+No seed or history import ran. Sports stay hidden in production (`SPORTS_ENABLED=false`) and the server has no
+`ODDS_API_KEY`: the code, tables and routes are deployed but inactive until both are set in `/etc/loteria.env`.
+The previous release remains under `/opt/loteria/releases/20261113T222822Z-e926629`;
+the database, environment and document backup is in `/var/backups/loteria/20261113T225429Z-2147c6a`.
+The public site, Casino route, lottery API and services were verified; the 10 users were preserved.
 
 ## Access and status
 
