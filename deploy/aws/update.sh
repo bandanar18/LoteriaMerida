@@ -4,7 +4,9 @@ umask 027
 archive=${1:?Provide release archive}
 revision=${2:?Provide revision}
 import_history=${3:-false}
+new_games=${4:-false}
 [[ "$import_history" = false || "$import_history" = --import-history ]] || { echo 'Invalid history option'; exit 1; }
+[[ "$new_games" = false || "$new_games" = --new-games-only ]] || { echo 'Invalid game option'; exit 1; }
 [[ "$revision" =~ ^[a-f0-9]{7,40}$ ]] || { echo 'Invalid revision'; exit 1; }
 release_id="$(date -u +%Y%m%dT%H%M%SZ)-$revision"
 release="/opt/loteria/releases/$release_id"
@@ -44,6 +46,9 @@ sudo -u postgres pg_dump -Fc loteria > "$backup/database.dump"
 cp -p /etc/loteria.env "$backup/environment"
 tar -czf "$backup/documents.tar.gz" -C /var/lib/loteria kyc
 sudo -u loteria npm run migrate -w @loteria/api
+if [ "$new_games" = --new-games-only ]; then
+  sudo -u loteria npm run seed -w @loteria/api -- --missing-games-only
+fi
 if [ "$import_history" = --import-history ]; then
   test -f "$release/apps/api/data/historial-sorteos.json"
   sudo -u loteria npm run historial:importar -w @loteria/api

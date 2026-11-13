@@ -12,6 +12,7 @@ import {
   SportQueryDto,
   UpdateOddsDto,
 } from './sports.dto';
+import { OddsFeedService } from './odds-feed.service';
 import { SportsTradingService } from './sports-trading.service';
 import { SportsService } from './sports.service';
 
@@ -54,7 +55,22 @@ export class SportsController {
 @Roles('SPORTS_TRADER', 'AUDITOR')
 @Controller('admin/sports')
 export class SportsAdminController {
-  constructor(private readonly trading: SportsTradingService) {}
+  constructor(
+    private readonly trading: SportsTradingService,
+    private readonly feed: OddsFeedService,
+  ) {}
+
+  @Get('feed')
+  feedStatus() {
+    return this.feed.status();
+  }
+
+  @Roles('SPORTS_TRADER')
+  @HttpCode(200)
+  @Post('feed/sync')
+  feedSync(@CurrentUser() u: AuthUser, @ClientIp() ip: string) {
+    return this.feed.syncNow(u.id, ip);
+  }
 
   @Get('events')
   events() {

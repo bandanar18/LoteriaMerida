@@ -8,7 +8,7 @@ export const MIN_ODDS = 10_100n; // 1.01
 export const MAX_ODDS = 10_000_000n; // 1000.00
 export const MAX_PARLAY_LEGS = 10;
 
-export type SportCode = 'FOOTBALL' | 'BASEBALL';
+export type SportCode = 'FOOTBALL' | 'BASEBALL' | 'BASKETBALL' | 'ICE_HOCKEY' | 'AMERICAN_FOOTBALL';
 export type SelectionResult = 'WIN' | 'LOSE' | 'VOID';
 export type SlipStatus = 'OPEN' | 'WON' | 'LOST' | 'VOID';
 export type OddsPolicy = 'ACCEPT_ANY' | 'ACCEPT_HIGHER' | 'NONE';
@@ -133,6 +133,52 @@ export const MARKET_TEMPLATES: MarketTemplate[] = [
     selections: [{ code: 'OVER', name: 'Más de {line}' }, { code: 'UNDER', name: 'Menos de {line}' }],
     rule: 'Incluye extras. Requiere 9 entradas (8.5 si gana el local); si no, se anula.',
   },
+  // Deportes de EE. UU. y básquet: siempre hay ganador (prórroga incluida), sin empate.
+  {
+    code: 'BASKETBALL_MONEYLINE',
+    sport: 'BASKETBALL',
+    name: 'Ganador del partido',
+    selections: [{ code: '1', name: '{home}' }, { code: '2', name: '{away}' }],
+    rule: 'Incluye prórroga.',
+  },
+  {
+    code: 'BASKETBALL_TOTAL',
+    sport: 'BASKETBALL',
+    name: 'Total de puntos',
+    line: 'TOTAL',
+    selections: [{ code: 'OVER', name: 'Más de {line}' }, { code: 'UNDER', name: 'Menos de {line}' }],
+    rule: 'Incluye prórroga. Línea entera exacta = devolución.',
+  },
+  {
+    code: 'HOCKEY_MONEYLINE',
+    sport: 'ICE_HOCKEY',
+    name: 'Ganador del partido',
+    selections: [{ code: '1', name: '{home}' }, { code: '2', name: '{away}' }],
+    rule: 'Incluye tiempo extra y penales.',
+  },
+  {
+    code: 'HOCKEY_TOTAL',
+    sport: 'ICE_HOCKEY',
+    name: 'Total de goles',
+    line: 'TOTAL',
+    selections: [{ code: 'OVER', name: 'Más de {line}' }, { code: 'UNDER', name: 'Menos de {line}' }],
+    rule: 'Marcador oficial incluyendo tiempo extra y penales. Línea entera exacta = devolución.',
+  },
+  {
+    code: 'GRIDIRON_MONEYLINE',
+    sport: 'AMERICAN_FOOTBALL',
+    name: 'Ganador del partido',
+    selections: [{ code: '1', name: '{home}' }, { code: '2', name: '{away}' }],
+    rule: 'Incluye tiempo extra. Si termina empatado se devuelve el monto.',
+  },
+  {
+    code: 'GRIDIRON_TOTAL',
+    sport: 'AMERICAN_FOOTBALL',
+    name: 'Total de puntos',
+    line: 'TOTAL',
+    selections: [{ code: 'OVER', name: 'Más de {line}' }, { code: 'UNDER', name: 'Menos de {line}' }],
+    rule: 'Incluye tiempo extra. Línea entera exacta = devolución.',
+  },
 ];
 
 export function marketTemplate(code: string): MarketTemplate | undefined {
@@ -181,10 +227,16 @@ export function settleSelection(marketCode: string, lineX100: number | null, sel
     }
     case 'DRAW_NO_BET':
     case 'MONEYLINE':
+    case 'BASKETBALL_MONEYLINE':
+    case 'HOCKEY_MONEYLINE':
+    case 'GRIDIRON_MONEYLINE':
       if (home === away) return 'VOID';
       return (home > away ? '1' : '2') === selectionCode ? 'WIN' : 'LOSE';
     case 'TOTAL_GOALS':
-    case 'TOTAL_RUNS': {
+    case 'TOTAL_RUNS':
+    case 'BASKETBALL_TOTAL':
+    case 'HOCKEY_TOTAL':
+    case 'GRIDIRON_TOTAL': {
       const total = (home + away) * 100;
       return selectionCode === 'OVER' ? cmp(total, line) : cmp(line, total);
     }

@@ -11,6 +11,7 @@
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
     "simulate:history": "tsx src/db/simulate-history.ts",
+    "odds:sync": "tsx src/db/sync-odds.ts",
     "simulate:market": "tsx src/db/simulate-market.ts",
     "pretypecheck": "npm run build -w @loteria/domain",
     "typecheck": "tsc -p tsconfig.json --noEmit",

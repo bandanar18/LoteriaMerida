@@ -18,8 +18,11 @@ import { MarketPage } from './pages/admin/Market';
 import { SettingsPage } from './pages/admin/Settings';
 import { LoginPage, ReferralLanding, RegisterPage } from './pages/Auth';
 import { FaqPage } from './pages/Faq';
+import { CasinoPage } from './pages/Casino';
 import { PlayPage } from './pages/Play';
 import { ResultsPage } from './pages/Results';
+import { SportsPage } from './pages/Sports';
+import { SportsTradingPage } from './pages/admin/Sports';
 import { SimulatorPage } from './pages/Simulator';
 import { TicketsPage } from './pages/Tickets';
 import { WalletPage } from './pages/Wallet';
@@ -33,6 +36,12 @@ function Require({ kind, children }: { kind: 'PLAYER' | 'STAFF'; children: React
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (user.kind !== kind) return <Navigate to={user.kind === 'STAFF' ? '/admin' : '/'} replace />;
   return <>{children}</>;
+}
+
+function SportsRoute({ children, fallback }: { children: ReactNode; fallback: string }) {
+  const platform = usePlatform();
+  if (platform.isPending) return <Spinner />;
+  return platform.data?.sportsEnabled ? children : <Navigate to={fallback} replace />;
 }
 
 function FuturesRoute({ children, fallback }: { children: ReactNode; fallback: string }) {
@@ -49,6 +58,9 @@ export function App() {
       <Route element={<PlayerLayout />}>
         <Route index element={<PlayPage />} />
         <Route path="resultados" element={<ResultsPage />} />
+        <Route path="deportes" element={<SportsRoute fallback="/"><SportsPage /></SportsRoute>} />
+        <Route path="casino" element={<CasinoPage />} />
+        <Route path="casino/:gameId" element={<CasinoPage />} />
         <Route path="futuros" element={<FuturesRoute fallback="/"><FuturesPage /></FuturesRoute>} />
         <Route path="preguntas-frecuentes" element={<FaqPage />} />
         <Route path="login" element={<LoginPage />} />
@@ -66,6 +78,7 @@ export function App() {
         <Route path="mercado" element={<MarketPage />} />
         <Route path="configuracion" element={<SettingsPage />} />
         <Route path="futuros" element={<FuturesRoute fallback="/admin"><FuturesAdminPage /></FuturesRoute>} />
+        <Route path="deportes" element={<SportsRoute fallback="/admin"><SportsTradingPage /></SportsRoute>} />
         <Route path="pagos" element={<PaymentsPage />} />
         <Route path="agencias" element={<AgenciesPage />} />
         <Route path="kyc" element={<KycPage />} />

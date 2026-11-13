@@ -129,3 +129,18 @@ describe('kyc', () => {
     expect(sniffMime(new TextEncoder().encode('<script>'))).toBeNull();
   });
 });
+
+describe('liquidación de básquet, hockey y fútbol americano', () => {
+  const s = (home: number, away: number) => ({ home, away });
+  it('ganador sin empate y totales con línea .5 o entera', () => {
+    expect(settleSelection('BASKETBALL_MONEYLINE', null, '1', s(112, 108))).toBe('WIN');
+    expect(settleSelection('BASKETBALL_MONEYLINE', null, '2', s(112, 108))).toBe('LOSE');
+    expect(settleSelection('BASKETBALL_TOTAL', 22050, 'OVER', s(112, 108))).toBe('LOSE');
+    expect(settleSelection('BASKETBALL_TOTAL', 22000, 'UNDER', s(112, 108))).toBe('VOID');
+    expect(settleSelection('BASKETBALL_TOTAL', 22000, 'OVER', s(110, 110))).toBe('VOID');
+    expect(settleSelection('HOCKEY_MONEYLINE', null, '2', s(2, 3))).toBe('WIN');
+    expect(settleSelection('HOCKEY_TOTAL', 550, 'OVER', s(4, 2))).toBe('WIN');
+    expect(settleSelection('GRIDIRON_MONEYLINE', null, '1', s(21, 21))).toBe('VOID');
+    expect(settleSelection('GRIDIRON_TOTAL', 4450, 'UNDER', s(20, 21))).toBe('WIN');
+  });
+});

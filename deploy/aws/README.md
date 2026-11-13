@@ -15,15 +15,16 @@ Deployment created in `us-east-1`:
 
 The temporary hostname uses the external sslip.io DNS service. Replace it with your own domain when available.
 
-Latest update: `9f40be6` from `origin/main`, deployed 2026-11-10 as
-`/opt/loteria/releases/20261110T212325Z-9f40be6` (plus the existing local startup and WebSocket fixes).
-All 22 migrations were already applied; the demonstration seed was not rerun.
-The committed history importer added 187 missing draws. All 231 game/date pairs in the history file are present;
-existing draws were preserved and random sample history was not regenerated.
-The previous release remains under `/opt/loteria/releases/20261110T205335Z-6e53c31`;
-the database, environment and document backup is in `/var/backups/loteria/20261110T212325Z-9f40be6`.
-Public HTML/assets, results route, agency bank catalog, API availability and WebSockets were verified.
-The administrator identity and password hash matched before and after deployment; the 2 users and 7 tickets were preserved.
+Latest update: base `e926629` plus the local Casino feature, deployed 2026-11-13 as
+`/opt/loteria/releases/20261113T222822Z-e926629`. The release manifest is `deploy/aws/release.json`.
+Casino is available at `/casino` and embeds six external GameMonetize games using provider demo chips;
+it does not send wallet or authentication information to the provider. See `docs/casino-providers.md`.
+All 29 migration files were already applied. No seed or history import ran during this update.
+The previous release remains under `/opt/loteria/releases/20261113T214249Z-e926629`;
+the database, environment and document backup is in `/var/backups/loteria/20261113T222822Z-e926629`.
+All 27 public HTML, JS, CSS, image and document files, Casino routes, the ten-game API and WebSockets were verified.
+The administrator identity and password hash matched before and after deployment; the 10 users and 14 tickets were preserved.
+No game settings, limits or schedules were changed by this update.
 
 ## Access and status
 
@@ -72,6 +73,9 @@ These backups remain on the same server and do not replace off-server backups.
 When intentionally deploying the committed demonstration draw history, include `apps/api/data` in the
 release archive and append `--import-history` to the update command. The repository importer only inserts
 missing draws; it does not overwrite existing results. Routine updates do not regenerate simulated history.
+If the update introduces new games, append `--new-games-only` after the history option (or after `false` if
+not importing history). This runs the seed with `--missing-games-only`: existing games are skipped, and
+no test users or balances are seeded.
 
 Run `bootstrap.sh` explicitly with `sudo bash` on a fresh Ubuntu server. Lightsail can wrap user data with a POSIX shell, so a Bash script should be launched through a Bash wrapper rather than pasted directly as user data.
 Run `install.sh HOSTNAME` only for the initial deployment after extracting the release to `/opt/loteria/app`.

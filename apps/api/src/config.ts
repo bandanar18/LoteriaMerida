@@ -24,6 +24,23 @@ export const config = {
   lotteryScheduler: (process.env.LOTTERY_SCHEDULER ?? 'true') === 'true',
   /** Deportes en pausa: por ahora solo se trabaja con animalitos. Con false el API no expone /sports ni /admin/sports. */
   sportsEnabled: (process.env.SPORTS_ENABLED ?? 'false') === 'true',
+  /**
+   * Cuotas reales de The Odds API (plan gratis: 500 créditos al mes; cada liga consume mercados × regiones).
+   * Sin ODDS_API_KEY el conector queda apagado y el trader sigue cargando eventos a mano.
+   */
+  oddsFeed: {
+    apiKey: process.env.ODDS_API_KEY ?? '',
+    regions: process.env.ODDS_API_REGIONS ?? 'eu',
+    /** Cada cuántos minutos sincroniza solo. Cada ronda gasta como máximo `creditsPerSync`: 16 × 30 rondas ≈ 480 créditos/mes. */
+    intervalMinutes: Math.max(30, Number(process.env.ODDS_API_INTERVAL_MINUTES ?? 1440)),
+    /** Créditos máximos por ronda. Las ligas que no alcanzan esperan su turno (se rota por antigüedad). */
+    creditsPerSync: Math.max(2, Number(process.env.ODDS_API_CREDITS_PER_SYNC ?? 16)),
+    horizonDays: Math.max(1, Number(process.env.ODDS_API_HORIZON_DAYS ?? 7)),
+    /** Con menos créditos que esto, el conector deja de consultar hasta el próximo ciclo mensual. */
+    minRemaining: Number(process.env.ODDS_API_MIN_REMAINING ?? 20),
+    /** Lista opcional (claves de The Odds API separadas por coma) que reemplaza a las ligas por defecto. */
+    leagues: (process.env.ODDS_API_LEAGUES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  },
   licenseLabel: process.env.LICENSE_LABEL ?? '',
   /** Bono de bienvenida por registro (DEMO), en unidades mínimas: 10.000 Bs y 10 USDT por defecto. */
   signupBonus: {

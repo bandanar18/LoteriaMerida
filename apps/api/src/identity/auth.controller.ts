@@ -92,6 +92,7 @@ export class AuthController {
       licenseLabel: config.licenseLabel,
       timezone: 'America/Caracas',
       futuresEnabled: settings?.trading_enabled === true,
+      sportsEnabled: config.sportsEnabled,
       // Bono de bienvenida DEMO (unidades mínimas): el invitado lo ve como saldo antes de registrarse.
       signupBonus: { VES: config.signupBonus.VES.toString(), USDT: config.signupBonus.USDT.toString() },
     };

@@ -18,14 +18,13 @@ const NAV = [
 ];
 
 /**
- * Menú de la casa de apuestas. Por ahora solo hay lotería: las secciones sin producto se muestran,
- * pero no llevan a ningún lado.
+ * Menú de la casa de apuestas. Las secciones disponibles tienen una ruta propia.
  */
 type SiteItem = { label: string; to?: string; end?: boolean; anchor?: string };
 const SITE: SiteItem[] = [
   { label: 'Inicio', to: '/', end: true },
-  { label: 'Deportes' },
-  { label: 'Casino' },
+  { label: 'Deportes', to: '/deportes' },
+  { label: 'Casino', to: '/casino' },
   { label: 'Lotería', to: '/', anchor: 'juegos' },
   { label: 'Hipismo' },
   { label: 'Promociones' },

@@ -132,7 +132,7 @@ export const useSimulationStatus = () =>
 export const usePlatform = () =>
   useQuery({
     queryKey: ['platform'], staleTime: 60_000, refetchInterval: 60_000,
-    queryFn: () => get<{ licenseLabel: string; futuresEnabled: boolean; signupBonus?: { VES: string; USDT: string } }>('/platform'),
+    queryFn: () => get<{ licenseLabel: string; futuresEnabled: boolean; sportsEnabled?: boolean; signupBonus?: { VES: string; USDT: string } }>('/platform'),
   });
 
 /** Cómo se llaman los símbolos de cada juego: animales (MER-05) o frutas (MER-03). */

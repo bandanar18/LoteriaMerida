@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { get } from './api';
 import { Currency, syncServerClock } from './format';
 
+export type SportCode = 'FOOTBALL' | 'BASEBALL' | 'BASKETBALL' | 'ICE_HOCKEY' | 'AMERICAN_FOOTBALL';
+
 export interface Selection {
   id: string;
   code: string;
@@ -32,7 +34,7 @@ export interface SportEvent {
   competition_id: string;
   competition: string;
   country: string;
-  sport: 'FOOTBALL' | 'BASEBALL';
+  sport: SportCode;
   home: string;
   away: string;
   markets: Market[];
@@ -46,7 +48,7 @@ export interface SportEvent {
 
 export interface MarketTemplate {
   code: string;
-  sport: 'FOOTBALL' | 'BASEBALL';
+  sport: SportCode;
   name: string;
   line?: 'TOTAL' | 'HANDICAP';
   selections: { code: string; name: string }[];
@@ -61,7 +63,7 @@ export interface Catalog {
   liveBetDelayMs: number;
 }
 
-export const SPORT_ICON: Record<string, string> = { FOOTBALL: '⚽', BASEBALL: '⚾' };
+export const SPORT_ICON: Record<string, string> = { FOOTBALL: '⚽', BASEBALL: '⚾', BASKETBALL: '🏀', ICE_HOCKEY: '🏒', AMERICAN_FOOTBALL: '🏈' };
 
 export const EVENT_STATUS_LABEL: Record<string, string> = {
   NOT_STARTED: 'Por comenzar',

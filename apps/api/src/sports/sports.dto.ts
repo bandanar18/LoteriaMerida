@@ -34,7 +34,7 @@ export class PlaceBetDto {
 }
 
 export class SportQueryDto {
-  @IsOptional() @IsIn(['FOOTBALL', 'BASEBALL']) sport?: 'FOOTBALL' | 'BASEBALL';
+  @IsOptional() @IsIn(['FOOTBALL', 'BASEBALL', 'BASKETBALL', 'ICE_HOCKEY', 'AMERICAN_FOOTBALL']) sport?: 'FOOTBALL' | 'BASEBALL' | 'BASKETBALL' | 'ICE_HOCKEY' | 'AMERICAN_FOOTBALL';
 }
 
 export class MarketInputDto {

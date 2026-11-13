@@ -340,6 +340,8 @@ const TEST_PLAYERS = [
 ];
 
 async function main() {
+  const missingGamesOnly = process.argv.includes('--missing-games-only');
+  let addedGames = 0;
   const pool = new Pool({ connectionString: config.databaseUrl });
   const ledger = new LedgerService();
   const audit = new AuditService();
@@ -350,6 +352,7 @@ async function main() {
                         ON CONFLICT DO NOTHING`);
 
     for (const g of GAMES) {
+      if (missingGamesOnly && (await client.query('SELECT 1 FROM lottery.game WHERE code = $1', [g.code])).rowCount) continue;
       const res = await client.query(
         `INSERT INTO lottery.game (code, name, result_source, payout_multiplier, close_minutes_before, license_ref, rules_version,
                                    is_demo, requires_record, publish_preliminary, prize_expiry_days, display_order, board, draw_count, auto_rng, star_max)
@@ -363,6 +366,7 @@ async function main() {
         [g.code, g.name, g.resultSource, g.license, g.rulesVersion, g.merida, g.prizeExpiryDays, g.displayOrder, g.payoutMultiplier, 'board' in g ? g.board : 'SYMBOLS', 'drawCount' in g ? g.drawCount : 1, 'starMax' in g ? g.starMax : null],
       );
       const gameId = res.rows[0].id;
+      addedGames++;
       // En un solo INSERT (Cuatrifecta trae 10.000 símbolos).
       await client.query(
         `INSERT INTO lottery.symbol (game_id, number, name, emoji, sort)
@@ -396,6 +400,12 @@ async function main() {
             .map((v) => (v === null ? null : String(v))),
         );
       }
+    }
+
+    if (missingGamesOnly) {
+      await client.query('COMMIT');
+      console.log(`Juegos nuevos cargados: ${addedGames}. Configuracion existente y usuarios conservados.`);
+      return;
     }
 
     const staff = [

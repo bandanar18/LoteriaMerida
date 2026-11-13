@@ -129,6 +129,10 @@ const NAV: { title: string; items: NavItem[] }[] = [
     items: [{ to: '/admin/futuros', label: 'Cumbre Futuros', icon: 'market', roles: ['LOTTERY_OPERATOR', 'AUDITOR'] }],
   },
   {
+    title: 'Deportes',
+    items: [{ to: '/admin/deportes', label: 'Trading deportivo', icon: 'sports', roles: ['SPORTS_TRADER', 'AUDITOR'] }],
+  },
+  {
     title: 'Finanzas',
     items: [
       { to: '/admin/pagos', label: 'Pagos', icon: 'payments', roles: ['CASHIER', 'AUDITOR'] },
@@ -182,6 +186,7 @@ function useClock() {
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const showFutures = usePlatform().data?.futuresEnabled === true;
+  const showSports = usePlatform().data?.sportsEnabled === true;
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawer, setDrawer] = useState(false);
@@ -191,7 +196,7 @@ export function AdminLayout() {
   const groups = NAV.map((g) => ({
     ...g,
     items: g.items.filter((n) =>
-      (showFutures || n.to !== '/admin/futuros') && (!n.roles || role === 'ADMIN' || n.roles.includes(role)),
+      (showFutures || n.to !== '/admin/futuros') && (showSports || n.to !== '/admin/deportes') && (!n.roles || role === 'ADMIN' || n.roles.includes(role)),
     ),
   })).filter((g) => g.items.length);
   const all = groups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })));

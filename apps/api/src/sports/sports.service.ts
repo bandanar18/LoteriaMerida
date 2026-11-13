@@ -58,7 +58,7 @@ export class SportsService {
 
   async catalog() {
     const [sports, competitions, limits] = await Promise.all([
-      this.db.query(`SELECT code, name FROM sports.sport ORDER BY code DESC`),
+      this.db.query(`SELECT code, name FROM sports.sport ORDER BY array_position(ARRAY['FOOTBALL','BASEBALL','BASKETBALL','ICE_HOCKEY','AMERICAN_FOOTBALL'], code)`),
       this.db.query(`SELECT id, sport_code, name, country FROM sports.competition ORDER BY sort, name`),
       this.db.query(
         `SELECT currency, min_stake::text, max_stake::text, max_payout::text, max_total_odds::text FROM sports.bet_limit ORDER BY currency`,

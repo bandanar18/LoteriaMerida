@@ -34,6 +34,7 @@ export function SportsTradingPage() {
     <div className="space-y-4">
       <PageTitle actions={canTrade && <button className="btn-primary" onClick={() => setCreating(true)}>+ Nuevo evento</button>}>Deportes · trading</PageTitle>
       {!canTrade && <Notice>Vista de solo lectura: las acciones requieren rol de trader.</Notice>}
+      <FeedCard canTrade={canTrade} />
       {events.isLoading || catalog.isLoading ? (
         <Spinner />
       ) : !events.data?.length ? (
@@ -293,7 +294,7 @@ function ProposeResult({ ev, onDone }: { ev: SportEvent; onDone: () => void }) {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-black/60">
-        Se cierra la venta de todos los mercados. Otro usuario debe confirmar el marcador antes de liquidar. {ev.sport === 'FOOTBALL' ? 'Marcador a 90 minutos + añadido.' : 'Marcador final incluyendo entradas extra.'}
+        Se cierra la venta de todos los mercados. Otro usuario debe confirmar el marcador antes de liquidar. {ev.sport === 'FOOTBALL' ? 'Marcador a 90 minutos + añadido.' : ev.sport === 'BASEBALL' ? 'Marcador final incluyendo entradas extra.' : 'Marcador final incluyendo prórroga o tiempo extra.'}
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -523,6 +524,61 @@ function AddMarket({ ev, catalog, onDone }: { ev: SportEvent; catalog: Catalog; 
       >
         Publicar mercado
       </button>
+    </div>
+  );
+}
+
+interface FeedStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalMinutes: number;
+  lastRun: {
+    startedAt: string;
+    finishedAt: string | null;
+    trigger: string;
+    leagues: number;
+    events: number;
+    markets: number;
+    oddsChanged: number;
+    creditsRemaining: number | null;
+    error: string | null;
+  } | null;
+}
+
+/** Estado del conector de cuotas reales (The Odds API) y sincronización manual. */
+function FeedCard({ canTrade }: { canTrade: boolean }) {
+  const qc = useQueryClient();
+  const feed = useQuery({ queryKey: ['admin', 'sports', 'feed'], queryFn: () => get<FeedStatus>('/admin/sports/feed'), refetchInterval: 30_000 });
+  const sync = useMutation({
+    mutationFn: () => post<FeedStatus>('/admin/sports/feed/sync'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'sports'] }),
+  });
+  if (!feed.data) return null;
+  const f = feed.data;
+  const run = f.lastRun;
+  return (
+    <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="min-w-0 text-sm">
+        <div className="font-semibold">Cuotas reales · The Odds API</div>
+        {!f.enabled ? (
+          <p className="text-black/60">Apagado: falta ODDS_API_KEY. Los eventos se cargan a mano.</p>
+        ) : !run ? (
+          <p className="text-black/60">Aún no se ha sincronizado. Se actualiza solo cada {Math.round(f.intervalMinutes / 60)} h.</p>
+        ) : run.error ? (
+          <p className="text-red-700">Última sincronización fallida ({dateTime(run.startedAt)}): {run.error}</p>
+        ) : (
+          <p className="text-black/60">
+            Última: {dateTime(run.startedAt)} · {run.events} partidos · {run.oddsChanged} cuotas cambiadas
+            {run.creditsRemaining !== null && ` · ${run.creditsRemaining} créditos restantes este mes`}
+          </p>
+        )}
+        {sync.error && <ErrorBox error={sync.error} />}
+      </div>
+      {canTrade && f.enabled && (
+        <button className="btn-ghost" disabled={sync.isPending || f.running} onClick={() => sync.mutate()}>
+          {sync.isPending || f.running ? 'Sincronizando…' : 'Sincronizar ahora'}
+        </button>
+      )}
     </div>
   );
 }

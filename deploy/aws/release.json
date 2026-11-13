@@ -1,0 +1,10 @@
+{
+  "baseRevision": "e926629",
+  "feature": "casino-external-demo",
+  "builtAt": "2026-11-13T22:26:14.316Z",
+  "hashes": {
+    "apps/web/dist/index.html": "4fd2b33aeb2be33293f546d6ae5a523e167162ed20dc26c52ca202e283818420",
+    "apps/web/src/pages/Casino.tsx": "819a5f9cec8508c67c14f34698bb3eb1e64a830f2ec7e9d1a667d9140972b1b8",
+    "apps/web/src/lib/casino.ts": "ff8e0e5e53615291544bb7220b6bf8a8c581e4630d2a09f55e7f9980d0e7c7ba"
+  }
+}
