@@ -231,7 +231,7 @@ export class PayoutService {
         )
       ).rows[0];
       await c.query(`UPDATE affiliate.sms_challenge SET code_hash = $2 WHERE id = $1`, [row.id, sha256(`${row.id}:${code}`)]);
-      const delivery = await this.sms.send(phone, `FortunaBet: tu código para ${editingId ? 'editar' : 'agregar'} un Pago Móvil es ${code}. No lo compartas.`);
+      const delivery = await this.sms.send(phone, `Fortuna.Bet: tu código para ${editingId ? 'editar' : 'agregar'} un Pago Móvil es ${code}. No lo compartas.`);
       await this.audit.log(c, {
         actorType: 'PLAYER',
         actorId: userId,

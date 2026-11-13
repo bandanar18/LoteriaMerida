@@ -247,17 +247,26 @@ export class LotteryService {
     }
   }
 
-  async listDraws(gameId: string, date?: string) {
+  /**
+   * Sorteos públicos de un día o de un rango de días (máx. 31). Los anulados no se publican:
+   * el jugador afectado ve el reembolso en su ticket.
+   */
+  async listDraws(gameId: string, date?: string, to?: string) {
     const day = date ?? localDate();
+    const end = to ?? day;
+    if (end < day) throw new BusinessError('INVALID_INPUT', 'La fecha final debe ser igual o posterior a la inicial');
+    const span = (Date.parse(end) - Date.parse(day)) / 86_400_000;
+    if (span > 30) throw new BusinessError('INVALID_INPUT', 'El rango máximo es de 31 días');
     return this.db.query(
       `SELECT ${PUBLIC_DRAW_COLUMNS}, now() AS server_now
          FROM lottery.draw d
          JOIN lottery.game g ON g.id = d.game_id
          LEFT JOIN lottery.symbol rs ON rs.id = d.result_symbol_id
          ${PRELIMINARY_JOIN}
-        WHERE d.game_id = $1 AND (d.draw_at AT TIME ZONE g.timezone)::date = $2::date AND d.sim_player_id IS NULL AND d.archived_at IS NULL
+        WHERE d.game_id = $1 AND (d.draw_at AT TIME ZONE g.timezone)::date BETWEEN $2::date AND $3::date
+          AND d.status <> 'CANCELLED' AND d.sim_player_id IS NULL AND d.archived_at IS NULL
         ORDER BY d.draw_at`,
-      [gameId, day],
+      [gameId, day, end],
     );
   }
 

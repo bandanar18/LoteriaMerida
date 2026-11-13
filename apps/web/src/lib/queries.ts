@@ -102,6 +102,15 @@ export const useAdminGames = () => useQuery({
   queryKey: ['admin', 'games'], queryFn: () => get<AdminGame[]>('/admin/lottery/games'), refetchInterval: 60_000,
 });
 
+/** Sorteos publicados entre dos fechas (inclusive, máx. 31 días), en orden de hora. */
+export const useDrawsRange = (gameId: string | undefined, from: string, to: string) =>
+  useQuery({
+    queryKey: ['draws', gameId, from, to],
+    enabled: !!gameId,
+    refetchInterval: 60_000,
+    queryFn: () => get<Draw[]>(`/lottery/games/${gameId}/draws?date=${from}&to=${to}`),
+  });
+
 export const useDraws = (gameId: string | undefined, date?: string) =>
   useQuery({
     queryKey: ['draws', gameId, date],

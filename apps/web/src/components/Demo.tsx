@@ -1,12 +1,12 @@
 /**
- * Avisos de aplicación DEMO. FortunaBet es una demostración: los saldos, bonos, premios y precios no tienen valor real,
+ * Avisos de aplicación DEMO. Fortuna.Bet es una demostración: los saldos, bonos, premios y precios no tienen valor real,
  * no hay pagos reales y no se permite su comercialización. Se muestra en todas las pantallas para evitar malentendidos.
  */
 
 export const DEMO_SHORT = 'APLICACIÓN DEMO · Sin valor real · Prohibida su comercialización';
 
 export const DEMO_TEXT =
-  'FortunaBet es una aplicación de demostración. Los saldos, bonos, apuestas, premios y operaciones no tienen valor real, ' +
+  'Fortuna.Bet es una aplicación de demostración. Los saldos, bonos, apuestas, premios y operaciones no tienen valor real, ' +
   'no se aceptan ni se pagan montos reales y no está autorizada por ningún ente regulador. ' +
   'Se prohíbe su comercialización, reventa o uso con fines comerciales.';
 

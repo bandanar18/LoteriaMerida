@@ -1,5 +1,5 @@
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RecentStrip, useUpcomingDraws } from '../components/ResultsBoard';
 import { TicketView } from '../components/TicketView';
@@ -46,19 +46,60 @@ export function PlayPage() {
       {!user && <GuestWelcome />}
       {games.data!.length > 1 && (
         <div>
-          <h2 className="title-display mb-3 text-3xl text-white sm:text-4xl">
-            Nuestros <span className="text-lima-400">juegos</span>
+          {/* «Oficiales» solo cuando exista la autorización: hoy son propuestas (DEMO, manuales «NO OFICIAL»). */}
+          <h2 className="title-display mb-3 text-2xl leading-tight text-white sm:text-3xl xl:text-4xl">
+            Juegos propuestos para la <span className="text-lima-400">Lotería del Estado Bolivariano de Mérida</span>
           </h2>
-          {/* Celular: fila deslizable. Desde sm: cuadrícula que llena el ancho. */}
-          <div className="no-scrollbar -mx-4 -my-1.5 flex snap-x gap-3 overflow-x-auto px-4 py-1.5 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] sm:gap-3 2xl:grid-cols-[repeat(auto-fit,minmax(136px,1fr))] sm:overflow-visible sm:px-0">
+          <GameRow>
             {games.data!.map((g) => (
               <GameCard key={g.id} game={g} active={g.id === game.id} onSelect={() => setGameId(g.id)} />
             ))}
-          </div>
+          </GameRow>
         </div>
       )}
       <RecentStrip key={`strip-${game.id}`} game={game} />
       <GameBoard key={game.id} game={game} />
+    </div>
+  );
+}
+
+/**
+ * Fila de tarjetas: llena el ancho cuando caben todas y se desliza de lado cuando la pantalla es más angosta.
+ * En escritorio aparecen flechas a los lados mientras quede contenido por ver.
+ */
+function GameRow({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const update = () => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  };
+  useEffect(() => {
+    update();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const move = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.8, behavior: 'smooth' });
+  const arrow = 'absolute top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-[#0a2219]/90 text-2xl text-white shadow-[0_6px_16px_rgba(0,0,0,.45)] ring-1 ring-white/20 backdrop-blur transition hover:bg-lima-500 hover:text-selva-950 sm:flex';
+  return (
+    <div className="relative">
+      <div ref={ref} onScroll={update} className="no-scrollbar -mx-4 -my-1.5 flex snap-x gap-3 overflow-x-auto scroll-smooth px-4 py-1.5 sm:mx-0 sm:px-0">
+        {children}
+      </div>
+      {edges.left && (
+        <button type="button" aria-label="Ver juegos anteriores" onClick={() => move(-1)} className={`${arrow} -left-3`}>
+          ‹
+        </button>
+      )}
+      {edges.right && (
+        <button type="button" aria-label="Ver más juegos" onClick={() => move(1)} className={`${arrow} -right-3`}>
+          ›
+        </button>
+      )}
     </div>
   );
 }
@@ -71,7 +112,7 @@ function GameCard({ game, active, onSelect }: { game: Game; active: boolean; onS
       type="button"
       onClick={onSelect}
       aria-pressed={active}
-      className={`group relative flex w-[44vw] max-w-[200px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-[#0f281d] text-left shadow-[0_10px_24px_rgba(0,0,0,.3)] transition hover:-translate-y-1 sm:w-auto sm:max-w-none ${
+      className={`group relative flex w-[44vw] max-w-[200px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-[#0f281d] text-left shadow-[0_10px_24px_rgba(0,0,0,.3)] transition hover:-translate-y-1 sm:w-auto sm:min-w-[160px] sm:max-w-none sm:flex-1 sm:basis-0 ${
         active ? 'ring-[3px] ring-lima-500 shadow-[0_0_24px_rgba(111,209,42,.35)]' : 'ring-1 ring-white/10 hover:ring-lima-500/70'
       }`}
     >

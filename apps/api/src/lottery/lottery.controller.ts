@@ -23,7 +23,7 @@ export class LotteryController {
   @Public()
   @Get('games/:id/draws')
   draws(@Param('id', ParseUUIDPipe) id: string, @Query() q: DrawsQueryDto) {
-    return this.lottery.listDraws(id, q.date);
+    return this.lottery.listDraws(id, q.date, q.to);
   }
 
   @Public()

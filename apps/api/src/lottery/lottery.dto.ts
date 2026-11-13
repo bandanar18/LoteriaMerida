@@ -85,6 +85,8 @@ export class UpdateBandDto {
 
 export class DrawsQueryDto {
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
+  /** Fin del rango (inclusive); con él, `date` es el inicio. Máximo 31 días. */
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) to?: string;
 }
 
 /** Acta del sorteo (MER-05 §7). El archivo (PDF/JPG/PNG) es opcional y llega como multipart. */

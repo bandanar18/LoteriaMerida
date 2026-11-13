@@ -17,6 +17,7 @@ import { RiskPage } from './pages/admin/Risk';
 import { MarketPage } from './pages/admin/Market';
 import { SettingsPage } from './pages/admin/Settings';
 import { LoginPage, ReferralLanding, RegisterPage } from './pages/Auth';
+import { FaqPage } from './pages/Faq';
 import { PlayPage } from './pages/Play';
 import { ResultsPage } from './pages/Results';
 import { SimulatorPage } from './pages/Simulator';
@@ -49,6 +50,7 @@ export function App() {
         <Route index element={<PlayPage />} />
         <Route path="resultados" element={<ResultsPage />} />
         <Route path="futuros" element={<FuturesRoute fallback="/"><FuturesPage /></FuturesRoute>} />
+        <Route path="preguntas-frecuentes" element={<FaqPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="registro" element={<RegisterPage />} />
         <Route path="r/:code" element={<ReferralLanding />} />

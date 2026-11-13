@@ -4,7 +4,7 @@ import { DayGrid, LatestAndNext, longDate, shiftDate, useRecentDraws } from '../
 import { Empty, ErrorBox, Modal, PageTitle, Spinner } from '../components/ui';
 import { get } from '../lib/api';
 import { todayCaracas } from '../lib/format';
-import { Draw, symbolWords, useDraws, useGames } from '../lib/queries';
+import { Draw, symbolWords, useDrawsRange, useGames } from '../lib/queries';
 
 export function ResultsPage() {
   const games = useGames();
@@ -14,11 +14,20 @@ export function ResultsPage() {
   const recent = useRecentDraws(game);
   // Mañana: solo los sorteos extraordinarios ya programados (los del calendario se ven en Jugar).
   const tomorrowExtra = recent.tomorrowDraws.data?.filter((d) => d.is_extraordinary) ?? [];
-  const [otherDate, setOtherDate] = useState(() => shiftDate(todayCaracas(), -2));
-  const other = useDraws(game?.id, otherDate);
+  // Rango de fechas: por defecto solo el día más reciente (hoy).
+  const today = todayCaracas();
+  const [range, setRange] = useState({ from: today, to: today });
+  const draws = useDrawsRange(game?.id, range.from, range.to);
+  const days = groupByDay(draws.data);
 
   if (games.isLoading) return <Spinner />;
   if (!game) return <Empty>No hay juegos disponibles.</Empty>;
+
+  const setFrom = (from: string) => setRange((r) => clampRange(from, r.to < from ? from : r.to, 'from'));
+  const setTo = (to: string) => setRange((r) => clampRange(r.from > to ? to : r.from, to, 'to'));
+  const preset = (n: number) => setRange({ from: shiftDate(today, -(n - 1)), to: today });
+  const presets: [string, number][] = [['Hoy', 1], ['3 días', 3], ['7 días', 7], ['30 días', 30]];
+  const dayTitle = (date: string) => (date === today ? 'Hoy' : date === shiftDate(today, -1) ? 'Ayer' : <span className="first-letter:uppercase">{longDate(date)}</span>);
 
   return (
     <div className="space-y-4">
@@ -39,40 +48,47 @@ export function ResultsPage() {
 
       <LatestAndNext latest={recent.latest} next={recent.next} now={recent.now} />
 
-      <Day title="Hoy" date={recent.today} draws={recent.todayDraws.data} loading={recent.todayDraws.isLoading} latestId={recent.latest?.id} nextId={recent.next?.id} onVerify={setVerifyId} />
-      {tomorrowExtra.length > 0 && (
+      <section className="card flex flex-wrap items-end gap-3 p-3 sm:p-4" aria-label="Rango de fechas">
+        <label className="flex flex-col gap-1">
+          <span className="label">Desde</span>
+          <input type="date" className="input w-auto" value={range.from} max={today} onChange={(e) => e.target.value && setFrom(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="label">Hasta</span>
+          <input type="date" className="input w-auto" value={range.to} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(([label, n]) => {
+            const active = range.to === today && range.from === shiftDate(today, -(n - 1));
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => preset(n)}
+                className={`btn px-3 py-2 text-sm ${active ? 'bg-selva-800 text-white' : 'bg-white text-selva-900 ring-1 ring-black/10'}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-xs text-(--muted) sm:ml-auto">Máximo 31 días</span>
+      </section>
+
+      {range.to === today && tomorrowExtra.length > 0 && (
         <Day title="Mañana" date={recent.tomorrow} draws={tomorrowExtra} nextId={recent.next?.id} onVerify={setVerifyId} />
       )}
-      <Day title="Ayer" date={recent.yesterday} draws={recent.yesterdayDraws.data} loading={recent.yesterdayDraws.isLoading} latestId={recent.latest?.id} onVerify={setVerifyId} />
-
-      <section>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-(--ink)">Otra fecha</h2>
-          <div className="flex items-center gap-1">
-            <button className="btn-ghost px-3" aria-label="Día anterior" onClick={() => setOtherDate(shiftDate(otherDate, -1))}>
-              ‹
-            </button>
-            <input
-              type="date"
-              className="input w-auto"
-              value={otherDate}
-              max={todayCaracas()}
-              onChange={(e) => e.target.value && setOtherDate(e.target.value)}
-              aria-label="Fecha"
-            />
-            <button
-              className="btn-ghost px-3"
-              aria-label="Día siguiente"
-              disabled={otherDate >= todayCaracas()}
-              onClick={() => setOtherDate(shiftDate(otherDate, 1))}
-            >
-              ›
-            </button>
-          </div>
-        </div>
-        <p className="mb-2 text-xs text-(--muted) first-letter:uppercase">{longDate(otherDate)}</p>
-        {other.isLoading ? <Spinner /> : !other.data?.length ? <Empty>No hay sorteos para esta fecha.</Empty> : <DayGrid draws={other.data} onVerify={setVerifyId} />}
-      </section>
+      {draws.isLoading ? (
+        <Spinner />
+      ) : draws.error ? (
+        <ErrorBox error={draws.error} />
+      ) : days.length === 0 ? (
+        <Empty>No hay sorteos en estas fechas.</Empty>
+      ) : (
+        days.map(([date, rows]) => (
+          <Day key={date} title={dayTitle(date)} date={date} draws={rows} latestId={recent.latest?.id} nextId={recent.next?.id} onVerify={setVerifyId} />
+        ))
+      )}
 
       <p className="text-xs text-(--muted)">
         Toca un resultado para verificarlo. Los resultados anteriores no influyen en los sorteos futuros:{' '}
@@ -92,6 +108,23 @@ export function ResultsPage() {
   );
 }
 
+/** Agrupa por día de Caracas, el más reciente primero; dentro del día, por hora. */
+function groupByDay(rows: Draw[] | undefined): [string, Draw[]][] {
+  const map = new Map<string, Draw[]>();
+  for (const d of rows ?? []) {
+    if (d.status === 'CANCELLED') continue; // los anulados nunca se publican
+    const day = todayCaracas(new Date(d.draw_at));
+    map.set(day, [...(map.get(day) ?? []), d]);
+  }
+  return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+}
+
+/** Mantiene el rango en 31 días como máximo, moviendo el extremo que no se acaba de cambiar. */
+function clampRange(from: string, to: string, changed: 'from' | 'to') {
+  if (shiftDate(from, 30) >= to) return { from, to };
+  return changed === 'from' ? { from, to: shiftDate(from, 30) } : { from: shiftDate(to, -30), to };
+}
+
 function Day(props: {
   title: ReactNode;
   date: string;
@@ -107,7 +140,10 @@ function Day(props: {
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 className="font-semibold text-(--ink)">
-          {props.title} <span className="text-sm font-normal text-(--muted)">· {longDate(props.date)}</span>
+          {props.title}
+          {(props.title === 'Hoy' || props.title === 'Ayer' || props.title === 'Mañana') && (
+            <span className="text-sm font-normal text-(--muted)"> · {longDate(props.date)}</span>
+          )}
         </h2>
         {draws.length > 0 && (
           <span className="shrink-0 text-xs text-(--muted) tabular-nums">

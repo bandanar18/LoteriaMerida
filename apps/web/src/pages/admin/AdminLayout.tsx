@@ -213,7 +213,7 @@ export function AdminLayout() {
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 text-lg shadow-inner">🍀</span>
         {!mini && (
           <div className="leading-tight">
-            <p className="text-sm font-bold tracking-tight text-white">FortunaBet</p>
+            <p className="text-sm font-bold tracking-tight text-white">Fortuna.Bet</p>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">Backoffice</p>
           </div>
         )}

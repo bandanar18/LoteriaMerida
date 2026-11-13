@@ -37,7 +37,7 @@ export function WalletPage() {
       <PageTitle>Billetera</PageTitle>
       {welcome && (
         <div className="rounded-2xl bg-gradient-to-r from-selva-700 to-selva-600 px-4 py-3 text-white">
-          <div className="text-lg font-extrabold">🎁 ¡Bienvenido a FortunaBet!</div>
+          <div className="text-lg font-extrabold">🎁 ¡Bienvenido a Fortuna.Bet!</div>
           <p className="text-sm text-white/85">
             Te acreditamos tu bono de bienvenida DEMO: <b>Bs. 10.000</b> y <b>10 USDT</b> de saldo de prueba. No tiene valor real y no se puede cobrar.
           </p>
